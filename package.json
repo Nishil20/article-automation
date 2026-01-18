@@ -1,0 +1,41 @@
+{
+  "name": "article-automation",
+  "version": "1.0.0",
+  "description": "Automated SEO article generation and WordPress publishing system",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit",
+    "dashboard": "cd dashboard && npm run dev",
+    "dashboard:build": "cd dashboard && npm run build"
+  },
+  "keywords": [
+    "seo",
+    "article-generation",
+    "wordpress",
+    "openai",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.1",
+    "google-trends-api": "^4.9.2",
+    "openai": "^4.28.0",
+    "rss-parser": "^3.13.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
