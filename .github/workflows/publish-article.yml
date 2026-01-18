@@ -69,6 +69,10 @@ jobs:
           VOICE_PERSPECTIVE: ${{ vars.VOICE_PERSPECTIVE || 'second_person' }}
           VOICE_PERSONALITY: ${{ vars.VOICE_PERSONALITY || 'friendly expert who uses analogies and real-world examples' }}
           
+          # Unsplash Configuration (for featured images)
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          UNSPLASH_ENABLED: ${{ vars.UNSPLASH_ENABLED || 'true' }}
+          
           # Logging
           LOG_LEVEL: info
         run: |
