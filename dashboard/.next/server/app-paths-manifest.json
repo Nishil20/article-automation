@@ -1,6 +1,8 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
+  "/api/settings/test/route": "app/api/settings/test/route.js",
   "/page": "app/page.js",
-  "/api/history/route": "app/api/history/route.js",
-  "/api/status/route": "app/api/status/route.js"
+  "/api/status/route": "app/api/status/route.js",
+  "/settings/page": "app/settings/page.js",
+  "/api/settings/route": "app/api/settings/route.js",
+  "/api/history/route": "app/api/history/route.js"
 }

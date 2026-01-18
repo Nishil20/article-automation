@@ -3,7 +3,7 @@ name: Publish Article
 on:
   # Run daily at 9 AM UTC
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 9,18 * * *'   # Twice daily
   
   # Allow manual trigger with optional inputs
   workflow_dispatch:
