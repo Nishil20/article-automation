@@ -16,7 +16,6 @@ import {
   Clock,
   ExternalLink,
   Users,
-  Target,
   Fingerprint,
   BookOpen,
   Link2,
@@ -49,37 +48,69 @@ interface PipelineStatusProps {
   error?: string;
 }
 
-const STEPS = [
-  { id: 'connecting', label: 'Connect', icon: Zap, description: 'WordPress connection' },
-  { id: 'trends', label: 'Topic', icon: Search, description: 'Finding trends' },
-  { id: 'competitors', label: 'Analyze', icon: Users, description: 'Competitor analysis' },
-  { id: 'keywords', label: 'Keywords', icon: Key, description: 'SEO keywords' },
-  { id: 'outline', label: 'Outline', icon: FileText, description: 'Article structure' },
-  { id: 'content', label: 'Content', icon: Sparkles, description: 'Writing article' },
-  { id: 'originality', label: 'Original', icon: Fingerprint, description: 'Originality check' },
-  { id: 'humanize', label: 'Humanize', icon: Wand2, description: 'Natural language' },
-  { id: 'readability', label: 'Readable', icon: BookOpen, description: 'Readability optimization' },
-  { id: 'image', label: 'Image', icon: Image, description: 'Featured image' },
-  { id: 'internal_links', label: 'Links', icon: Link2, description: 'Internal linking' },
-  { id: 'schema', label: 'Schema', icon: Code2, description: 'SEO markup' },
-  { id: 'publish', label: 'Publish', icon: Send, description: 'WordPress upload' },
+// Group steps into logical phases for cleaner display
+const PHASES = [
+  {
+    id: 'setup',
+    label: 'Setup',
+    icon: Zap,
+    steps: ['connecting'],
+  },
+  {
+    id: 'research',
+    label: 'Research',
+    icon: Search,
+    steps: ['trends', 'competitors', 'keywords'],
+  },
+  {
+    id: 'writing',
+    label: 'Writing',
+    icon: Sparkles,
+    steps: ['outline', 'content', 'originality', 'humanize', 'readability'],
+  },
+  {
+    id: 'optimize',
+    label: 'Optimize',
+    icon: Image,
+    steps: ['image', 'internal_links', 'schema'],
+  },
+  {
+    id: 'publish',
+    label: 'Publish',
+    icon: Send,
+    steps: ['publish'],
+  },
 ] as const;
 
-function getStepStatus(stepId: string, currentStep: PipelineStep): 'pending' | 'active' | 'complete' | 'failed' {
-  // Handle special states that aren't in the STEPS array
-  if (currentStep === 'failed') {
-    // Mark all steps as failed when pipeline fails
-    return 'failed';
-  }
-  
+// Detailed steps for the current phase display
+const STEP_DETAILS: Record<string, { label: string; description: string; icon: typeof Zap }> = {
+  connecting: { label: 'Connecting', description: 'WordPress connection', icon: Zap },
+  trends: { label: 'Finding Topics', description: 'Analyzing trends', icon: Search },
+  competitors: { label: 'Analyzing', description: 'Competitor research', icon: Users },
+  keywords: { label: 'Keywords', description: 'SEO optimization', icon: Key },
+  outline: { label: 'Outlining', description: 'Article structure', icon: FileText },
+  content: { label: 'Writing', description: 'Generating content', icon: Sparkles },
+  originality: { label: 'Checking', description: 'Originality scan', icon: Fingerprint },
+  humanize: { label: 'Humanizing', description: 'Natural language', icon: Wand2 },
+  readability: { label: 'Optimizing', description: 'Readability check', icon: BookOpen },
+  image: { label: 'Image', description: 'Featured image', icon: Image },
+  internal_links: { label: 'Linking', description: 'Internal links', icon: Link2 },
+  schema: { label: 'Schema', description: 'SEO markup', icon: Code2 },
+  publish: { label: 'Publishing', description: 'WordPress upload', icon: Send },
+};
+
+function getPhaseStatus(phase: typeof PHASES[number], currentStep: PipelineStep): 'pending' | 'active' | 'complete' | 'failed' {
+  if (currentStep === 'failed') return 'failed';
   if (currentStep === 'complete') return 'complete';
   if (currentStep === 'idle') return 'pending';
   
-  const currentIndex = STEPS.findIndex((s) => s.id === currentStep);
-  const stepIndex = STEPS.findIndex((s) => s.id === stepId);
+  const allSteps = PHASES.flatMap(p => p.steps);
+  const currentIndex = allSteps.indexOf(currentStep);
+  const phaseStartIndex = allSteps.indexOf(phase.steps[0]);
+  const phaseEndIndex = allSteps.indexOf(phase.steps[phase.steps.length - 1]);
   
-  if (stepIndex < currentIndex) return 'complete';
-  if (stepIndex === currentIndex) return 'active';
+  if (currentIndex > phaseEndIndex) return 'complete';
+  if (currentIndex >= phaseStartIndex && currentIndex <= phaseEndIndex) return 'active';
   return 'pending';
 }
 
@@ -93,38 +124,38 @@ export function PipelineStatus({ step, progress, message, topic, error }: Pipeli
   const urlMatch = message.match(/(https?:\/\/[^\s]+)/);
   const publishedUrl = urlMatch ? urlMatch[1] : null;
 
+  // Get current step details
+  const currentStepDetails = step !== 'idle' && step !== 'complete' && step !== 'failed' 
+    ? STEP_DETAILS[step] 
+    : null;
+
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
-      {/* Header with status indicator */}
-      <div className={cn(
-        'px-6 py-4 border-b border-border',
-        isRunning && 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent',
-        isComplete && 'bg-gradient-to-r from-green-500/10 via-green-500/5 to-transparent',
-        isFailed && 'bg-gradient-to-r from-destructive/10 via-destructive/5 to-transparent'
-      )}>
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-border">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Pipeline Status</h2>
+          <h2 className="text-lg font-semibold">Pipeline</h2>
           <div className="flex items-center gap-2">
             {isRunning && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-primary/20 rounded-full">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                 <span className="text-xs text-primary font-medium">Running</span>
               </div>
             )}
             {isComplete && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-green-500/20 rounded-full">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 rounded-full">
                 <CheckCircle className="w-3.5 h-3.5 text-green-500" />
                 <span className="text-xs text-green-500 font-medium">Complete</span>
               </div>
             )}
             {isFailed && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-destructive/20 rounded-full">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-destructive/10 rounded-full">
                 <XCircle className="w-3.5 h-3.5 text-destructive" />
                 <span className="text-xs text-destructive font-medium">Failed</span>
               </div>
             )}
             {isIdle && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-secondary rounded-full">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-full">
                 <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground font-medium">Ready</span>
               </div>
@@ -134,101 +165,148 @@ export function PipelineStatus({ step, progress, message, topic, error }: Pipeli
       </div>
 
       <div className="p-6">
-        {/* Progress bar */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Progress</span>
-            <span className="text-sm font-medium">{Math.round(progress)}%</span>
-          </div>
-          <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
-            <div
-              className={cn(
-                'h-full transition-all duration-700 ease-out rounded-full',
-                isFailed ? 'bg-destructive' : 'bg-gradient-to-r from-primary to-primary/70'
-              )}
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <p className="text-sm text-muted-foreground mt-2 min-h-[20px]">
-            {publishedUrl ? (
-              <a 
-                href={publishedUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:underline inline-flex items-center gap-1"
-              >
-                {message.replace(publishedUrl, '')}
-                <span className="text-primary">{publishedUrl}</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            ) : (
-              message
-            )}
-          </p>
-        </div>
-
-        {/* Steps visualization - scrollable on smaller screens */}
-        <div className="overflow-x-auto pb-2 -mx-2 px-2">
-          <div className="flex gap-2 min-w-max">
-            {STEPS.map((s) => {
-              const status = getStepStatus(s.id, step);
-              const Icon = s.icon;
-              
-              return (
-                <div key={s.id} className="flex flex-col items-center min-w-[52px]">
+        {/* Phase indicators - clean horizontal layout */}
+        <div className="flex items-center justify-between mb-6">
+          {PHASES.map((phase, index) => {
+            const status = getPhaseStatus(phase, step);
+            const Icon = phase.icon;
+            
+            return (
+              <div key={phase.id} className="flex items-center">
+                <div className="flex flex-col items-center">
                   <div
                     className={cn(
-                      'w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-300',
+                      'w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300',
                       status === 'pending' && 'bg-secondary text-muted-foreground',
-                      status === 'active' && 'bg-primary text-primary-foreground shadow-lg shadow-primary/30 scale-110',
+                      status === 'active' && 'bg-primary text-primary-foreground ring-4 ring-primary/20',
                       status === 'complete' && 'bg-primary/20 text-primary',
                       status === 'failed' && 'bg-destructive/20 text-destructive'
                     )}
-                    title={s.description}
                   >
                     {status === 'active' ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-[18px] h-[18px] animate-spin" />
                     ) : status === 'complete' ? (
-                      <CheckCircle className="w-4 h-4" />
+                      <CheckCircle className="w-[18px] h-[18px]" />
                     ) : status === 'failed' ? (
-                      <XCircle className="w-4 h-4" />
+                      <XCircle className="w-[18px] h-[18px]" />
                     ) : (
-                      <Icon className="w-4 h-4" />
+                      <Icon className="w-[18px] h-[18px]" />
                     )}
                   </div>
                   <span
                     className={cn(
-                      'text-[9px] mt-1 font-medium text-center leading-tight whitespace-nowrap',
+                      'text-[11px] mt-2 font-medium',
                       status === 'pending' && 'text-muted-foreground',
                       status === 'active' && 'text-primary',
                       status === 'complete' && 'text-primary/80',
                       status === 'failed' && 'text-destructive'
                     )}
                   >
-                    {s.label}
+                    {phase.label}
                   </span>
                 </div>
-              );
-            })}
-          </div>
+                {index < PHASES.length - 1 && (
+                  <div className="flex-1 mx-3 mt-[-18px]">
+                    <div
+                      className={cn(
+                        'h-0.5 rounded-full transition-all duration-500',
+                        status === 'complete' ? 'bg-primary/40' : 'bg-secondary'
+                      )}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+
+        {/* Current step details - only show when running */}
+        {currentStepDetails && (
+          <div className="mb-6 p-4 bg-primary/5 border border-primary/10 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <currentStepDetails.icon className="w-4 h-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">{currentStepDetails.label}</p>
+                <p className="text-xs text-muted-foreground">{currentStepDetails.description}</p>
+              </div>
+              <div className="text-right">
+                <span className="text-lg font-semibold text-primary">{Math.round(progress)}%</span>
+              </div>
+            </div>
+            <div className="mt-3 h-1.5 bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Idle state - show progress bar */}
+        {isIdle && (
+          <div className="mb-6 p-4 bg-secondary/30 border border-border rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground">Ready to generate</p>
+                <p className="text-xs text-muted-foreground/70">Configure settings and start the pipeline</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Complete state */}
+        {isComplete && (
+          <div className="mb-6 p-4 bg-green-500/5 border border-green-500/10 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-green-500">Pipeline Complete</p>
+                <p className="text-xs text-muted-foreground">
+                  {publishedUrl ? (
+                    <a 
+                      href={publishedUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      View published article
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : (
+                    message
+                  )}
+                </p>
+              </div>
+              <span className="text-lg font-semibold text-green-500">100%</span>
+            </div>
+          </div>
+        )}
 
         {/* Topic display */}
         {topic && (
-          <div className="mt-6 p-4 bg-secondary/30 rounded-xl border border-border">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">Topic</span>
+          <div className="p-4 bg-secondary/30 rounded-xl border border-border">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Topic</span>
             <p className="text-sm font-medium mt-1">{topic}</p>
           </div>
         )}
 
         {/* Error display */}
         {error && (
-          <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl">
-            <div className="flex items-start gap-2">
-              <XCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
-              <div>
-                <span className="text-xs text-destructive font-medium uppercase tracking-wider">Error</span>
-                <p className="text-sm text-destructive/90 mt-1">{error}</p>
+          <div className="mt-4 p-4 bg-destructive/5 border border-destructive/10 rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                <XCircle className="w-4 h-4 text-destructive" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-destructive">Pipeline Failed</p>
+                <p className="text-xs text-destructive/80 mt-0.5 break-words">{error}</p>
               </div>
             </div>
           </div>
