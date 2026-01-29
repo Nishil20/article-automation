@@ -92,7 +92,9 @@ export async function getSettings(): Promise<Settings> {
     voiceTone: process.env.VOICE_TONE || 'conversational',
     voicePerspective: process.env.VOICE_PERSPECTIVE || 'second_person',
     voicePersonality: process.env.VOICE_PERSONALITY || 'friendly expert who uses analogies',
-    unsplashEnabled: process.env.UNSPLASH_ENABLED !== 'false' && !!process.env.UNSPLASH_ACCESS_KEY,
+    // Default to true — the pipeline itself checks for the access key.
+    // The dashboard may not have access to the parent .env where UNSPLASH_ACCESS_KEY is defined.
+    unsplashEnabled: process.env.UNSPLASH_ENABLED !== 'false',
   };
   return readJSON<Settings>(SETTINGS_FILE, defaults);
 }

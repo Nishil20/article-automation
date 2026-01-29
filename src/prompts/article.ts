@@ -1,4 +1,4 @@
-import { VoiceConfig, ArticleKeywords, ArticleOutline, UniqueAngle, CompetitorAnalysis } from '../types/index.js';
+import { VoiceConfig, ArticleKeywords, ArticleOutline, ArticleSection, UniqueAngle, CompetitorAnalysis } from '../types/index.js';
 
 /**
  * System prompt for consistent AI behavior
@@ -361,4 +361,281 @@ Your task:
 5. Make the content feel more unique and valuable
 
 Output the improved HTML content only. Do NOT wrap in markdown code blocks.`;
+}
+
+/**
+ * Generate an introduction section for an article
+ */
+export function getIntroductionPrompt(
+  title: string,
+  keywords: ArticleKeywords,
+  voiceConfig: VoiceConfig,
+  outlineIntro: string
+): string {
+  const perspectiveGuide = {
+    first_person: 'Use "I" and "we" - share personal insights and experiences',
+    second_person: 'Address the reader directly with "you" and "your"',
+    third_person: 'Use neutral, informative language without personal pronouns',
+  };
+
+  const toneGuide = {
+    conversational: 'Write like you\'re talking to a friend - relaxed but informative',
+    professional: 'Maintain authority and expertise while remaining accessible',
+    casual: 'Keep it light, fun, and easy to read - like a blog post',
+    authoritative: 'Position as the definitive resource on this topic',
+  };
+
+  return `Write the INTRODUCTION for an article titled "${title}".
+
+OUTLINE HOOK: ${outlineIntro}
+
+SEO KEYWORDS:
+- Primary: "${keywords.primary}" (MUST appear in the first paragraph)
+- Secondary: ${keywords.secondary.join(', ')}
+
+VOICE & TONE:
+- Tone: ${voiceConfig.tone} - ${toneGuide[voiceConfig.tone]}
+- Perspective: ${voiceConfig.perspective} - ${perspectiveGuide[voiceConfig.perspective]}
+- Personality: ${voiceConfig.personality}
+
+REQUIREMENTS:
+- Write 150-200 words
+- Hook the reader with a compelling opening
+- Establish the article's value proposition
+- Include the primary keyword naturally in the first 2 sentences
+- Use semantic HTML: <p> tags for paragraphs
+- Do NOT include any heading tags — just the introduction paragraphs
+- Keep paragraphs under 4 sentences
+
+IMPORTANT: Output clean HTML only. No markdown code blocks. No <h2> or <h1> tags.`;
+}
+
+/**
+ * Generate a single H2 section of an article
+ */
+export function getSectionGenerationPrompt(
+  section: ArticleSection,
+  sectionIndex: number,
+  totalSections: number,
+  keywords: ArticleKeywords,
+  voiceConfig: VoiceConfig,
+  articleTitle: string
+): string {
+  const perspectiveGuide = {
+    first_person: 'Use "I" and "we" - share personal insights and experiences',
+    second_person: 'Address the reader directly with "you" and "your"',
+    third_person: 'Use neutral, informative language without personal pronouns',
+  };
+
+  const toneGuide = {
+    conversational: 'Write like you\'re talking to a friend - relaxed but informative',
+    professional: 'Maintain authority and expertise while remaining accessible',
+    casual: 'Keep it light, fun, and easy to read - like a blog post',
+    authoritative: 'Position as the definitive resource on this topic',
+  };
+
+  return `Write ONE section of an article titled "${articleTitle}".
+This is section ${sectionIndex + 1} of ${totalSections}.
+
+SECTION TO WRITE:
+- H2 Heading: "${section.heading}"
+${section.subheadings && section.subheadings.length > 0 ? `- H3 Subheadings: ${section.subheadings.join(', ')}` : ''}
+- Key Points to Cover: ${section.keyPoints.join('; ')}
+
+SEO KEYWORDS (use naturally, do NOT stuff):
+- Primary: "${keywords.primary}" (use 1 time in this section)
+- Secondary: ${keywords.secondary.join(', ')} (use 1 if natural)
+- LSI Keywords: ${keywords.lsiKeywords.join(', ')} (sprinkle 1-2)
+
+VOICE & TONE:
+- Tone: ${voiceConfig.tone} - ${toneGuide[voiceConfig.tone]}
+- Perspective: ${voiceConfig.perspective} - ${perspectiveGuide[voiceConfig.perspective]}
+- Personality: ${voiceConfig.personality}
+
+REQUIREMENTS:
+- Write 250-400 words for this section (MINIMUM 250 words — this is critical)
+- Start with <h2>${section.heading}</h2>
+- Use <h3> for any subheadings
+- Use <p> for paragraphs, <ul>/<li> for lists, <strong> for emphasis
+- Include specific data, examples, or actionable advice
+- Use transition words to connect ideas
+- Keep paragraphs under 4 sentences
+- Do NOT repeat content from other sections
+
+IMPORTANT: Output clean HTML only. No markdown code blocks. Start with the <h2> tag.`;
+}
+
+/**
+ * Generate a conclusion section for an article
+ */
+export function getConclusionPrompt(
+  title: string,
+  keywords: ArticleKeywords,
+  voiceConfig: VoiceConfig,
+  outlineConclusion: string
+): string {
+  const perspectiveGuide = {
+    first_person: 'Use "I" and "we" - share personal insights and experiences',
+    second_person: 'Address the reader directly with "you" and "your"',
+    third_person: 'Use neutral, informative language without personal pronouns',
+  };
+
+  const toneGuide = {
+    conversational: 'Write like you\'re talking to a friend - relaxed but informative',
+    professional: 'Maintain authority and expertise while remaining accessible',
+    casual: 'Keep it light, fun, and easy to read - like a blog post',
+    authoritative: 'Position as the definitive resource on this topic',
+  };
+
+  return `Write the CONCLUSION for an article titled "${title}".
+
+OUTLINE CONCLUSION NOTES: ${outlineConclusion}
+
+SEO KEYWORDS:
+- Primary: "${keywords.primary}" (include once naturally)
+
+VOICE & TONE:
+- Tone: ${voiceConfig.tone} - ${toneGuide[voiceConfig.tone]}
+- Perspective: ${voiceConfig.perspective} - ${perspectiveGuide[voiceConfig.perspective]}
+- Personality: ${voiceConfig.personality}
+
+REQUIREMENTS:
+- Write 150-200 words
+- Summarize key takeaways
+- End with a clear call-to-action or thought-provoking statement
+- Use semantic HTML: <h2>Conclusion</h2> or a more creative heading, then <p> tags
+- Keep paragraphs under 4 sentences
+
+IMPORTANT: Output clean HTML only. No markdown code blocks. Start with <h2>.`;
+}
+
+/**
+ * Expand a section that is too short
+ */
+export function getSectionExpansionPrompt(
+  sectionContent: string,
+  sectionHeading: string,
+  articleTitle: string,
+  keywords: ArticleKeywords
+): string {
+  return `The following section from the article "${articleTitle}" is too short and needs expansion.
+
+SECTION HEADING: "${sectionHeading}"
+CURRENT CONTENT:
+${sectionContent}
+
+SEO KEYWORDS:
+- Primary: "${keywords.primary}"
+- LSI Keywords: ${keywords.lsiKeywords.join(', ')}
+
+REQUIREMENTS:
+- Add 100-150 more words to this section
+- Add more specific details, examples, statistics, or actionable tips
+- Maintain the same HTML structure and tone
+- Integrate naturally with the existing content
+- Do NOT repeat what's already written
+
+Output the COMPLETE expanded section including the original content and new additions. Clean HTML only. No markdown code blocks.`;
+}
+
+/**
+ * Generate FAQ questions and answers for an article
+ */
+export function getFAQGenerationPrompt(
+  articleTitle: string,
+  articleContent: string,
+  keywords: ArticleKeywords
+): string {
+  return `Generate FAQ (Frequently Asked Questions) for the following article.
+
+ARTICLE TITLE: "${articleTitle}"
+PRIMARY KEYWORD: "${keywords.primary}"
+SECONDARY KEYWORDS: ${keywords.secondary.join(', ')}
+
+ARTICLE CONTENT PREVIEW:
+${articleContent.substring(0, 2000)}...
+
+Generate 5-7 commonly asked questions that:
+1. Are genuinely useful questions people search for related to this topic
+2. Include the primary keyword naturally in at least 2 questions
+3. Cover different aspects of the topic (what, how, why, when, comparison, cost, etc.)
+4. Have concise, informative answers (2-4 sentences each)
+5. Would trigger Google's "People Also Ask" featured snippet
+
+Generate a JSON response:
+{
+  "faqs": [
+    {
+      "question": "What is...?",
+      "answer": "Concise, informative answer here."
+    }
+  ]
+}
+
+Respond ONLY with valid JSON, no additional text.`;
+}
+
+/**
+ * Generate an outline that is cluster-aware (links back to pillar content)
+ */
+export function getClusterAwareOutlinePrompt(
+  topic: string,
+  keywords: ArticleKeywords,
+  uniqueAngle: UniqueAngle,
+  clusterContext: {
+    pillarTopic: string;
+    existingArticles: Array<{ title: string; slug: string }>;
+    contentType: 'pillar' | 'cluster';
+  }
+): string {
+  const clusterInstructions = clusterContext.contentType === 'cluster'
+    ? `This is a CLUSTER article supporting the pillar topic "${clusterContext.pillarTopic}".
+- Reference and build upon the pillar topic naturally
+- Include 1-2 natural mentions where readers should check the pillar article for more depth
+- Focus on this specific subtopic while acknowledging the broader context
+
+Existing articles in this cluster:
+${clusterContext.existingArticles.map(a => `- "${a.title}"`).join('\n')}`
+    : `This is a PILLAR article — the comprehensive guide for the cluster topic "${clusterContext.pillarTopic}".
+- Cover the topic broadly and comprehensively
+- Create sections that individual cluster articles can dive deeper into
+- This should be the most authoritative piece in the cluster`;
+
+  return `Create a detailed article outline for a 1500-2000 word SEO-optimized article with topic cluster awareness.
+
+TOPIC: "${topic}"
+PRIMARY KEYWORD: "${keywords.primary}"
+SECONDARY KEYWORDS: ${keywords.secondary.join(', ')}
+LSI KEYWORDS: ${keywords.lsiKeywords.join(', ')}
+
+UNIQUE ANGLE:
+- Angle: ${uniqueAngle.angle}
+- Target Audience: ${uniqueAngle.targetAudience}
+
+CLUSTER CONTEXT:
+${clusterInstructions}
+
+Requirements:
+- Create an engaging title that includes the primary keyword
+- Write a compelling introduction (2-3 sentences)
+- Include 4-6 main sections (H2 headings)
+- Each section should have 1-3 subheadings (H3) where appropriate
+- List 2-4 key points per section
+- Write a conclusion summary
+
+Generate a JSON response:
+{
+  "title": "Article title with primary keyword",
+  "introduction": "2-3 sentence hook",
+  "sections": [
+    {
+      "heading": "H2 heading text",
+      "subheadings": ["H3 subheading 1", "H3 subheading 2"],
+      "keyPoints": ["Point 1", "Point 2", "Point 3"]
+    }
+  ],
+  "conclusion": "Summary"
+}
+
+Respond ONLY with valid JSON, no additional text.`;
 }

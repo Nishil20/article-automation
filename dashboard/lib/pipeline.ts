@@ -4,16 +4,19 @@ export type PipelineStep =
   | 'idle'
   | 'connecting'
   | 'trends'
-  | 'competitors'    // NEW: Analyzing competitor content
+  | 'cluster'
+  | 'competitors'
   | 'keywords'
   | 'outline'
   | 'content'
-  | 'originality'    // NEW: Checking originality
+  | 'originality'
   | 'humanize'
-  | 'readability'    // NEW: Optimizing readability
+  | 'readability'
+  | 'faq'
+  | 'toc'
   | 'image'
-  | 'internal_links' // NEW: Adding internal links
-  | 'schema'         // NEW: Generating schema markup
+  | 'internal_links'
+  | 'schema'
   | 'publish'
   | 'complete'
   | 'failed';
@@ -61,19 +64,22 @@ const STALE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes - consider stale if running
 
 const STEP_PROGRESS: Record<PipelineStep, number> = {
   idle: 0,
-  connecting: 5,
-  trends: 10,
-  competitors: 15,      // NEW
-  keywords: 22,
-  outline: 30,
-  content: 40,
-  originality: 50,      // NEW
-  humanize: 58,
-  readability: 66,      // NEW
-  image: 74,
-  internal_links: 82,   // NEW
-  schema: 88,           // NEW
-  publish: 94,
+  connecting: 3,
+  trends: 7,
+  cluster: 11,
+  competitors: 15,
+  keywords: 20,
+  outline: 26,
+  content: 34,
+  originality: 42,
+  humanize: 50,
+  readability: 56,
+  faq: 62,
+  toc: 66,
+  image: 72,
+  internal_links: 78,
+  schema: 84,
+  publish: 92,
   complete: 100,
   failed: 0,
 };

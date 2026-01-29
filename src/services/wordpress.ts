@@ -200,14 +200,27 @@ export class WordPressService {
     }
 
     // Add SEO meta fields for both Yoast and RankMath
+    const featuredImageUrl = article.featuredImage?.url || '';
     postData.meta = {
       // Yoast SEO
       _yoast_wpseo_title: article.metaTitle,
       _yoast_wpseo_metadesc: article.metaDescription,
+      // Yoast OG/Twitter
+      _yoast_wpseo_opengraph_title: article.metaTitle,
+      _yoast_wpseo_opengraph_description: article.metaDescription,
+      _yoast_wpseo_opengraph_image: featuredImageUrl,
+      _yoast_wpseo_twitter_title: article.metaTitle,
+      _yoast_wpseo_twitter_description: article.metaDescription,
+      _yoast_wpseo_twitter_image: featuredImageUrl,
       // RankMath SEO
       rank_math_focus_keyword: article.keywords.primary,
       rank_math_description: article.metaDescription,
       rank_math_title: article.metaTitle,
+      // RankMath OG/Twitter
+      rank_math_facebook_title: article.metaTitle,
+      rank_math_facebook_description: article.metaDescription,
+      rank_math_facebook_image: featuredImageUrl,
+      rank_math_twitter_use_facebook: 'on',
     };
 
     log.info('SEO meta fields to be set', {
@@ -333,12 +346,14 @@ export class WordPressService {
   }
 
   /**
-   * Upload media (for featured images)
+   * Upload media (for featured images) with optional alt text and caption
    */
   async uploadMedia(
     buffer: Buffer,
     filename: string,
-    mimeType: string
+    mimeType: string,
+    altText?: string,
+    caption?: string
   ): Promise<{ id: number; url: string }> {
     try {
       log.info(`Uploading media: ${filename}`);
@@ -350,8 +365,24 @@ export class WordPressService {
         },
       });
 
+      const mediaId = response.data.id;
+
+      // Update alt text and caption if provided
+      if (altText || caption) {
+        try {
+          const updateData: Record<string, string> = {};
+          if (altText) updateData.alt_text = altText;
+          if (caption) updateData.caption = caption;
+
+          await this.client.post(`/media/${mediaId}`, updateData);
+          log.info(`Media ${mediaId} updated with alt text and caption`);
+        } catch (metaError) {
+          log.warn('Failed to set media alt text/caption', metaError);
+        }
+      }
+
       return {
-        id: response.data.id,
+        id: mediaId,
         url: response.data.source_url,
       };
     } catch (error) {
@@ -389,8 +420,8 @@ export class WordPressService {
       const relatedPosts: RelatedPost[] = [];
       const seenIds = new Set<number>();
 
-      // Search for posts matching each keyword
-      for (const keyword of keywords.slice(0, 3)) {
+      // Search for posts matching each keyword (no artificial cap)
+      for (const keyword of keywords) {
         try {
           const response = await this.client.get('/posts', {
             params: {
@@ -408,17 +439,29 @@ export class WordPressService {
 
             seenIds.add(post.id);
 
-            // Calculate a simple relevance score based on keyword match
+            // Multi-factor relevance scoring
             const title = post.title.rendered.toLowerCase();
             const keywordLower = keyword.toLowerCase();
-            const relevanceScore = title.includes(keywordLower) ? 1.0 : 0.5;
+
+            let relevanceScore = 0.3; // Base score for appearing in search
+
+            // Exact keyword match in title
+            if (title.includes(keywordLower)) {
+              relevanceScore += 0.4;
+            }
+
+            // Word overlap ratio between keyword and title
+            const keywordWords = keywordLower.split(/\s+/);
+            const titleWords = title.replace(/<[^>]+>/g, '').split(/\s+/);
+            const overlapping = keywordWords.filter(w => titleWords.includes(w));
+            relevanceScore += 0.3 * (overlapping.length / keywordWords.length);
 
             relatedPosts.push({
               id: post.id,
               title: post.title.rendered,
               slug: post.slug,
               link: post.link,
-              relevanceScore,
+              relevanceScore: Math.min(relevanceScore, 1.0),
             });
           }
         } catch (searchError) {
@@ -462,31 +505,61 @@ export class WordPressService {
     const postsToLink = relatedPosts.slice(0, maxLinks);
 
     for (const post of postsToLink) {
-      // Extract key terms from the post title to find matching text
-      const titleWords = post.title
-        .replace(/<[^>]+>/g, '') // Remove HTML entities
-        .replace(/&[^;]+;/g, '') // Remove HTML entities
+      const cleanTitle = post.title
+        .replace(/<[^>]+>/g, '')
+        .replace(/&[^;]+;/g, '');
+      const titleWords = cleanTitle
         .split(/\s+/)
-        .filter(word => word.length > 4) // Only words > 4 chars
-        .slice(0, 3); // Take first 3 significant words
+        .filter(word => word.length > 3);
 
-      // Try to find a matching phrase in the content to link
-      for (const word of titleWords) {
-        // Create a regex to find the word (not already in a link)
-        const wordRegex = new RegExp(
-          `(?<!<a[^>]*>)\\b(${this.escapeRegex(word)})\\b(?![^<]*<\\/a>)`,
-          'i'
+      // Build candidate anchor phrases: 2-word phrases from title, then single words
+      const candidates: string[] = [];
+      for (let i = 0; i < titleWords.length - 1; i++) {
+        candidates.push(`${titleWords[i]} ${titleWords[i + 1]}`);
+      }
+      candidates.push(...titleWords.filter(w => w.length > 4));
+
+      let linked = false;
+      for (const phrase of candidates) {
+        // Only match within <p> tags (avoid linking in headings, nav, etc.)
+        const phraseRegex = new RegExp(
+          `(<p[^>]*>(?:(?!</p>).)*?)\\b(${this.escapeRegex(phrase)})\\b((?:(?!</p>).)*?</p>)`,
+          'is'
         );
 
-        if (wordRegex.test(updatedContent)) {
-          // Replace first occurrence with a link
-          updatedContent = updatedContent.replace(
-            wordRegex,
-            `<a href="${post.link}" title="${this.escapeHtml(post.title)}">$1</a>`
+        const match = phraseRegex.exec(updatedContent);
+        if (match) {
+          // Ensure the match is not already inside an <a> tag
+          const before = match[1];
+          if (!before.match(/<a[^>]*>[^<]*$/i)) {
+            updatedContent = updatedContent.replace(
+              phraseRegex,
+              `$1<a href="${post.link}" title="${this.escapeHtml(cleanTitle)}">$2</a>$3`
+            );
+            linksAdded++;
+            log.info(`Added internal link to: ${cleanTitle}`);
+            linked = true;
+            break;
+          }
+        }
+      }
+
+      if (!linked) {
+        // Fallback: single word match within <p>
+        for (const word of titleWords.filter(w => w.length > 4).slice(0, 3)) {
+          const wordRegex = new RegExp(
+            `(?<!<a[^>]*>)\\b(${this.escapeRegex(word)})\\b(?![^<]*<\\/a>)`,
+            'i'
           );
-          linksAdded++;
-          log.info(`Added internal link to: ${post.title}`);
-          break; // Only add one link per related post
+          if (wordRegex.test(updatedContent)) {
+            updatedContent = updatedContent.replace(
+              wordRegex,
+              `<a href="${post.link}" title="${this.escapeHtml(cleanTitle)}">$1</a>`
+            );
+            linksAdded++;
+            log.info(`Added internal link to: ${cleanTitle}`);
+            break;
+          }
         }
       }
 

@@ -60,18 +60,34 @@ export async function POST(request: NextRequest) {
           setStep('connecting', 'Testing WordPress connection...');
         } else if (text.includes('Discovering trending topic')) {
           setStep('trends', 'Discovering trending topic...');
+        } else if (text.includes('Classifying topic cluster')) {
+          setStep('cluster', 'Classifying topic cluster...');
+        } else if (text.includes('Analyzing competitors')) {
+          setStep('competitors', 'Analyzing competitors...');
         } else if (text.includes('Generating keywords')) {
           setStep('keywords', 'Generating keywords...');
         } else if (text.includes('Generating outline')) {
           setStep('outline', 'Generating article outline...');
-        } else if (text.includes('Generating article content')) {
+        } else if (text.includes('Generating article content') || text.includes('Generating article with unique angle')) {
           setStep('content', 'Writing article content...');
+        } else if (text.includes('Checking and improving originality')) {
+          setStep('originality', 'Checking originality...');
         } else if (text.includes('Humanizing article')) {
           setStep('humanize', 'Humanizing content...');
+        } else if (text.includes('Optimizing readability')) {
+          setStep('readability', 'Optimizing readability...');
+        } else if (text.includes('Generating FAQ')) {
+          setStep('faq', 'Generating FAQ...');
+        } else if (text.includes('Generating table of contents')) {
+          setStep('toc', 'Generating table of contents...');
         } else if (text.includes('Fetching featured image')) {
           setStep('image', 'Fetching featured image...');
         } else if (text.includes('Featured image uploaded')) {
           setStep('image', 'Featured image ready!');
+        } else if (text.includes('Adding internal links')) {
+          setStep('internal_links', 'Adding internal links...');
+        } else if (text.includes('Generating schema markup')) {
+          setStep('schema', 'Generating schema markup...');
         } else if (text.includes('Publishing to WordPress')) {
           setStep('publish', 'Publishing to WordPress...');
         } else if (text.includes('Selected topic:')) {
@@ -94,7 +110,10 @@ export async function POST(request: NextRequest) {
           
           // Parse successful output for article details
           const titleMatch = cleanOutput.match(/Article: (.+)/);
-          const wordMatch = cleanOutput.match(/(\d+) words/);
+          // Match the last "X words" occurrence — section-by-section logs emit
+          // multiple word counts (intro, each section, conclusion) before the final total
+          const wordMatches = Array.from(cleanOutput.matchAll(/(\d+) words/g));
+          const wordMatch = wordMatches.length > 0 ? wordMatches[wordMatches.length - 1] : null;
           
           // Clean the slug (remove any trailing special characters)
           const rawSlug = result.postUrl?.split('/').filter(Boolean).pop() || '';

@@ -1,14 +1,14 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { 
-  Zap, 
-  Search, 
-  Key, 
-  FileText, 
-  Sparkles, 
-  Wand2, 
-  Send, 
+import {
+  Zap,
+  Search,
+  Key,
+  FileText,
+  Sparkles,
+  Wand2,
+  Send,
   Image,
   CheckCircle,
   XCircle,
@@ -19,13 +19,17 @@ import {
   Fingerprint,
   BookOpen,
   Link2,
-  Code2
+  Code2,
+  Network,
+  HelpCircle,
+  List,
 } from 'lucide-react';
 
 type PipelineStep =
   | 'idle'
   | 'connecting'
   | 'trends'
+  | 'cluster'
   | 'competitors'
   | 'keywords'
   | 'outline'
@@ -33,6 +37,8 @@ type PipelineStep =
   | 'originality'
   | 'humanize'
   | 'readability'
+  | 'faq'
+  | 'toc'
   | 'image'
   | 'internal_links'
   | 'schema'
@@ -60,13 +66,13 @@ const PHASES = [
     id: 'research',
     label: 'Research',
     icon: Search,
-    steps: ['trends', 'competitors', 'keywords'],
+    steps: ['trends', 'cluster', 'competitors', 'keywords'],
   },
   {
     id: 'writing',
     label: 'Writing',
     icon: Sparkles,
-    steps: ['outline', 'content', 'originality', 'humanize', 'readability'],
+    steps: ['outline', 'content', 'originality', 'humanize', 'readability', 'faq', 'toc'],
   },
   {
     id: 'optimize',
@@ -86,6 +92,7 @@ const PHASES = [
 const STEP_DETAILS: Record<string, { label: string; description: string; icon: typeof Zap }> = {
   connecting: { label: 'Connecting', description: 'WordPress connection', icon: Zap },
   trends: { label: 'Finding Topics', description: 'Analyzing trends', icon: Search },
+  cluster: { label: 'Clustering', description: 'Topic classification', icon: Network },
   competitors: { label: 'Analyzing', description: 'Competitor research', icon: Users },
   keywords: { label: 'Keywords', description: 'SEO optimization', icon: Key },
   outline: { label: 'Outlining', description: 'Article structure', icon: FileText },
@@ -93,6 +100,8 @@ const STEP_DETAILS: Record<string, { label: string; description: string; icon: t
   originality: { label: 'Checking', description: 'Originality scan', icon: Fingerprint },
   humanize: { label: 'Humanizing', description: 'Natural language', icon: Wand2 },
   readability: { label: 'Optimizing', description: 'Readability check', icon: BookOpen },
+  faq: { label: 'FAQ', description: 'Generating FAQ', icon: HelpCircle },
+  toc: { label: 'TOC', description: 'Table of contents', icon: List },
   image: { label: 'Image', description: 'Featured image', icon: Image },
   internal_links: { label: 'Linking', description: 'Internal links', icon: Link2 },
   schema: { label: 'Schema', description: 'SEO markup', icon: Code2 },

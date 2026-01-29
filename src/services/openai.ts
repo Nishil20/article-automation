@@ -17,6 +17,11 @@ import {
   getCompetitorAnalysisPrompt,
   getUniqueAnglePrompt,
   getOutlineWithAnglePrompt,
+  getIntroductionPrompt,
+  getSectionGenerationPrompt,
+  getConclusionPrompt,
+  getSectionExpansionPrompt,
+  getFAQGenerationPrompt,
 } from '../prompts/article.js';
 import { logger } from '../utils/logger.js';
 
@@ -52,16 +57,23 @@ export class OpenAIService {
   private async complete(
     systemPrompt: string,
     userPrompt: string,
-    temperature: number = 0.7
+    temperature: number = 0.7,
+    maxTokens?: number
   ): Promise<string> {
-    const response = await this.client.chat.completions.create({
+    const params: OpenAI.ChatCompletionCreateParamsNonStreaming = {
       model: this.model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
       temperature,
-    });
+    };
+
+    if (maxTokens) {
+      params.max_tokens = maxTokens;
+    }
+
+    const response = await this.client.chat.completions.create(params);
 
     // Track usage
     if (response.usage) {
@@ -351,13 +363,13 @@ export class OpenAIService {
     // Step 4: Generate outline incorporating unique angle
     const outline = await this.generateOutlineWithAngle(topic, keywords, uniqueAngle);
 
-    // Step 5: Generate content
-    const content = await this.generateContent(outline, keywords);
+    // Step 5: Generate content section-by-section for better word count
+    const content = await this.generateContentBySection(outline, keywords);
 
     // Step 6: Generate meta
     const meta = await this.generateMeta(outline.title, content, keywords);
 
-    const wordCount = content.split(/\s+/).length;
+    const wordCount = this.countWords(content);
 
     log.info('Enhanced article generation complete', {
       title: outline.title,
@@ -380,6 +392,115 @@ export class OpenAIService {
       competitorAnalysis,
       uniqueAngle,
     };
+  }
+
+  /**
+   * Count words in HTML content (strips tags)
+   */
+  private countWords(html: string): number {
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return text ? text.split(/\s+/).length : 0;
+  }
+
+  /**
+   * Generate article content section by section for better word count control
+   */
+  async generateContentBySection(
+    outline: ArticleOutline,
+    keywords: ArticleKeywords
+  ): Promise<string> {
+    log.info(`Generating article content section-by-section for: ${outline.title}`);
+
+    const voiceConfig = this.config.voice;
+    const parts: string[] = [];
+
+    // 1. Generate introduction (150-200 words)
+    log.info('Generating introduction...');
+    const introPrompt = getIntroductionPrompt(outline.title, keywords, voiceConfig, outline.introduction);
+    const rawIntro = await this.complete(SYSTEM_PROMPT, introPrompt, 0.75, 4096);
+    const intro = this.stripCodeBlocks(rawIntro);
+    parts.push(intro);
+    log.info(`Introduction: ${this.countWords(intro)} words`);
+
+    // 2. Generate each section individually (250-400 words each)
+    const sectionContents: string[] = [];
+    for (let i = 0; i < outline.sections.length; i++) {
+      const section = outline.sections[i];
+      log.info(`Generating section ${i + 1}/${outline.sections.length}: ${section.heading}`);
+
+      const sectionPrompt = getSectionGenerationPrompt(
+        section, i, outline.sections.length, keywords, voiceConfig, outline.title
+      );
+      const rawSection = await this.complete(SYSTEM_PROMPT, sectionPrompt, 0.75, 4096);
+      const sectionContent = this.stripCodeBlocks(rawSection);
+      sectionContents.push(sectionContent);
+      parts.push(sectionContent);
+      log.info(`Section "${section.heading}": ${this.countWords(sectionContent)} words`);
+    }
+
+    // 3. Generate conclusion (150-200 words)
+    log.info('Generating conclusion...');
+    const conclusionPrompt = getConclusionPrompt(outline.title, keywords, voiceConfig, outline.conclusion);
+    const rawConclusion = await this.complete(SYSTEM_PROMPT, conclusionPrompt, 0.75, 4096);
+    const conclusion = this.stripCodeBlocks(rawConclusion);
+    parts.push(conclusion);
+    log.info(`Conclusion: ${this.countWords(conclusion)} words`);
+
+    // 4. Assemble and check total word count
+    let fullContent = parts.join('\n\n');
+    let totalWords = this.countWords(fullContent);
+    log.info(`Initial total word count: ${totalWords}`);
+
+    // 5. If under 1400 words, expand the shortest section
+    if (totalWords < 1400 && sectionContents.length > 0) {
+      log.info('Word count below 1400, expanding shortest section...');
+
+      let shortestIdx = 0;
+      let shortestLen = Infinity;
+      for (let i = 0; i < sectionContents.length; i++) {
+        const wc = this.countWords(sectionContents[i]);
+        if (wc < shortestLen) {
+          shortestLen = wc;
+          shortestIdx = i;
+        }
+      }
+
+      const expandPrompt = getSectionExpansionPrompt(
+        sectionContents[shortestIdx],
+        outline.sections[shortestIdx].heading,
+        outline.title,
+        keywords
+      );
+      const rawExpanded = await this.complete(SYSTEM_PROMPT, expandPrompt, 0.75, 4096);
+      const expanded = this.stripCodeBlocks(rawExpanded);
+
+      // Replace the shortest section in parts (offset by 1 for intro)
+      parts[shortestIdx + 1] = expanded;
+      fullContent = parts.join('\n\n');
+      totalWords = this.countWords(fullContent);
+      log.info(`After expansion: ${totalWords} words`);
+    }
+
+    log.info(`Section-by-section generation complete: ${totalWords} words`);
+    return fullContent;
+  }
+
+  /**
+   * Generate FAQ questions and answers for an article
+   */
+  async generateFAQs(
+    title: string,
+    content: string,
+    keywords: ArticleKeywords
+  ): Promise<Array<{ question: string; answer: string }>> {
+    log.info('Generating FAQ content');
+
+    const prompt = getFAQGenerationPrompt(title, content, keywords);
+    const response = await this.complete(SYSTEM_PROMPT, prompt, 0.6);
+    const parsed = this.parseJSON<{ faqs: Array<{ question: string; answer: string }> }>(response);
+
+    log.info(`Generated ${parsed.faqs.length} FAQ items`);
+    return parsed.faqs;
   }
 
   /**

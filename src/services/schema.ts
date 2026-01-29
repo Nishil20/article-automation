@@ -257,4 +257,19 @@ ${JSON.stringify(schema, null, 2)}
       })),
     };
   }
+
+  /**
+   * Inject multiple JSON-LD schemas into HTML content
+   */
+  injectMultipleSchemas(content: string, schemas: object[]): string {
+    const scriptTags = schemas
+      .filter(schema => Object.keys(schema).length > 0)
+      .map(
+        (schema) =>
+          `<script type="application/ld+json">\n${JSON.stringify(schema, null, 2)}\n</script>`
+      )
+      .join('\n');
+
+    return `${content}\n\n${scriptTags}`;
+  }
 }

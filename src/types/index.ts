@@ -74,10 +74,22 @@ export interface WordPressPostData {
     // Yoast SEO
     _yoast_wpseo_title?: string;
     _yoast_wpseo_metadesc?: string;
+    // Yoast OG/Twitter
+    _yoast_wpseo_opengraph_title?: string;
+    _yoast_wpseo_opengraph_description?: string;
+    _yoast_wpseo_opengraph_image?: string;
+    _yoast_wpseo_twitter_title?: string;
+    _yoast_wpseo_twitter_description?: string;
+    _yoast_wpseo_twitter_image?: string;
     // RankMath SEO
     rank_math_focus_keyword?: string;
     rank_math_description?: string;
     rank_math_title?: string;
+    // RankMath OG/Twitter
+    rank_math_facebook_title?: string;
+    rank_math_facebook_description?: string;
+    rank_math_facebook_image?: string;
+    rank_math_twitter_use_facebook?: string;
   };
 }
 
@@ -211,4 +223,23 @@ export interface OriginalityCheck {
   cliches: string[];            // Clichéd expressions found
   uniqueElements: string[];     // What makes it original
   suggestions: string[];        // How to improve originality
+}
+
+// Topic cluster types for topical authority
+export interface TopicCluster {
+  id: string;
+  pillarTopic: string;
+  keywords: string[];
+  articles: ClusterArticle[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClusterArticle {
+  title: string;
+  slug: string;
+  url: string;
+  publishedAt: string;
+  keywords: string[];
+  contentType: 'pillar' | 'cluster';
 }
