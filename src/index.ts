@@ -7,19 +7,16 @@ import { WordPressService } from './services/wordpress.js';
 import { UnsplashService } from './services/unsplash.js';
 import { ReadabilityService } from './services/readability.js';
 import { SchemaService } from './services/schema.js';
-import { TopicClusterService } from './services/topic-cluster.js';
-import { KeywordResearchService } from './services/keyword-research.js';
 import { PipelineResult } from './types/index.js';
-import { renderFAQSection, generateTableOfContents } from './utils/content.js';
 
 const log = logger.child('Pipeline');
 
 /**
- * Enhanced article automation pipeline with originality and SEO improvements
+ * Simplified article automation pipeline (10 steps, 4-5 API calls)
  */
 async function runPipeline(): Promise<PipelineResult> {
   const startTime = Date.now();
-  log.info('Starting ENHANCED article automation pipeline');
+  log.info('Starting article automation pipeline');
 
   try {
     // Load configuration
@@ -34,24 +31,38 @@ async function runPipeline(): Promise<PipelineResult> {
     const unsplashService = new UnsplashService(config.unsplash);
     const readabilityService = new ReadabilityService(config);
     const schemaService = new SchemaService(config.wordpress);
-    const clusterService = new TopicClusterService({ apiKey: config.openai.apiKey });
-    const keywordService = new KeywordResearchService(config);
 
-    // Calculate total steps (base: 19, +1 if Unsplash enabled)
-    const totalSteps = unsplashService.isEnabled() ? 20 : 19;
+    // Calculate total steps (base: 10, +1 if Unsplash enabled)
+    const totalSteps = unsplashService.isEnabled() ? 11 : 10;
     let currentStep = 0;
 
+    // Step timing helper
+    let stepStart = Date.now();
+    const stepTimings: Array<{ step: string; duration: string }> = [];
+
+    function startStep(stepNum: number, label: string): void {
+      currentStep = stepNum;
+      stepStart = Date.now();
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      log.info(`Step ${stepNum}/${totalSteps}: ${label} [elapsed: ${elapsed}s]`);
+    }
+
+    function endStep(label: string): void {
+      const dur = ((Date.now() - stepStart) / 1000).toFixed(1);
+      stepTimings.push({ step: label, duration: `${dur}s` });
+      log.info(`Step ${currentStep} done in ${dur}s`);
+    }
+
     // Step 1: Test WordPress connection
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Testing WordPress connection`);
+    startStep(1, 'Testing WordPress connection');
     const wpConnected = await wordpressService.testConnection();
     if (!wpConnected) {
       throw new Error('Failed to connect to WordPress');
     }
+    endStep('WordPress connection');
 
     // Step 2: Get trending topic
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Discovering trending topic`);
+    startStep(2, 'Discovering trending topic');
     const topic = await trendsService.getTopicForArticle();
     if (!topic) {
       throw new Error('No trending topics found');
@@ -59,114 +70,53 @@ async function runPipeline(): Promise<PipelineResult> {
     log.info(`Selected topic: ${topic.title}`, {
       relatedQueries: topic.relatedQueries.slice(0, 5),
     });
+    endStep('Topic discovery');
 
-    // Step 3: Classify topic cluster (with embeddings, falls back to Jaccard)
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Classifying topic cluster`);
-    let clusterResult;
-    try {
-      clusterResult = await clusterService.classifyTopicWithEmbeddings(topic.title, topic.relatedQueries);
-    } catch (clusterError) {
-      log.warn('Embedding classification failed, falling back to keyword matching', clusterError);
-      clusterResult = clusterService.classifyTopic(topic.title, topic.relatedQueries);
-    }
-    log.info('Topic cluster classification', {
-      clusterId: clusterResult.clusterId,
-      contentType: clusterResult.contentType,
-      isNewCluster: clusterResult.isNew,
+    // Step 3: Generate keywords
+    startStep(3, 'Generating keywords');
+    const keywords = await openaiService.generateKeywords(topic);
+    log.info('Keywords generated', {
+      primary: keywords.primary,
+      secondaryCount: keywords.secondary.length,
     });
+    endStep('Keyword generation');
 
-    // Step 4: Research keywords
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Researching keywords`);
-    const keywordCandidates = await keywordService.researchKeywords(topic.title, topic.relatedQueries);
-    log.info(`Keyword research complete: ${keywordCandidates.length} candidates`);
-
-    // Step 5: Check keyword cannibalization (non-critical)
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Checking keyword cannibalization`);
-    let cannibalizationResults;
-    try {
-      cannibalizationResults = await keywordService.checkCannibalization(keywordCandidates);
-      const cannibalizedCount = cannibalizationResults.filter(r => r.isCannibalized).length;
-      log.info(`Cannibalization check: ${cannibalizedCount} overlapping keywords found`);
-    } catch (cannError) {
-      log.warn('Cannibalization check failed, continuing without', cannError);
-      cannibalizationResults = keywordCandidates.map(c => ({
-        keyword: c.keyword,
-        overlappingArticles: [] as Array<{ title: string; slug: string; similarity: number; matchedKeywords: string[] }>,
-        isCannibalized: false,
-        suggestedLongTails: [] as string[],
-      }));
-    }
-
-    // Step 6: Classify search intent (non-critical)
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Classifying search intent`);
-    let classifiedKeywords;
-    try {
-      classifiedKeywords = await keywordService.classifyIntent(keywordCandidates);
-      log.info('Search intent classification complete');
-    } catch (intentError) {
-      log.warn('Intent classification failed, defaulting to informational', intentError);
-      classifiedKeywords = keywordCandidates;
-    }
-
-    // Step 7: Score and prioritize keywords (critical gate)
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Scoring and prioritizing keywords`);
-    const keywordPlan = keywordService.scoreAndPrioritize(classifiedKeywords, cannibalizationResults);
-    log.info(`Keyword plan: primary="${keywordPlan.primary.keyword}" (score: ${keywordPlan.score.toFixed(1)})`);
-
-    // Expand long-tails (non-critical)
-    try {
-      keywordPlan.longTails = await keywordService.expandLongTails(keywordPlan.primary.keyword);
-      log.info(`Expanded ${keywordPlan.longTails.length} long-tail keywords`);
-    } catch (ltError) {
-      log.warn('Long-tail expansion failed, continuing without', ltError);
-      keywordPlan.longTails = [];
-    }
-
-    // Step 8: Analyze competitors
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Analyzing competitors`);
-    const competitorAnalysis = await openaiService.analyzeCompetitors(topic);
-    log.info('Competitor analysis complete', {
-      contentGaps: competitorAnalysis.contentGaps.length,
-      uniqueOpportunities: competitorAnalysis.uniqueOpportunities.length,
+    // Step 4: Generate outline
+    startStep(4, 'Generating outline');
+    const outline = await openaiService.generateOutline(topic, keywords);
+    log.info('Outline generated', {
+      title: outline.title,
+      sectionCount: outline.sections.length,
     });
+    endStep('Outline generation');
 
-    // Step 9: Generate article with keyword plan (uses external competitor analysis)
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Generating article with keyword plan`);
-    const { article: rawArticle, uniqueAngle } = await openaiService.generateArticleWithKeywordPlan(
-      topic,
-      keywordPlan,
-      competitorAnalysis
-    );
-    log.info(`Raw article generated: ${rawArticle.wordCount} words`, {
-      uniqueAngle: uniqueAngle.angle.substring(0, 80) + '...',
-    });
+    // Step 5: Generate article content
+    startStep(5, 'Generating article content');
+    const content = await openaiService.generateContent(outline, keywords);
+    const meta = await openaiService.generateMeta(outline.title, content, keywords);
+    const rawWordCount = content.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(w => w.length > 0).length;
+    log.info(`Article generated: ${rawWordCount} words`);
+    endStep('Article generation');
 
-    // Step 10: Check and improve originality
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Checking and improving originality`);
-    const { content: originalContent, originalityCheck } = await humanizerService.enhanceOriginality(rawArticle.content);
-    rawArticle.content = originalContent;
-    log.info('Originality check complete', {
-      score: originalityCheck.overallScore,
-      genericPhrasesFound: originalityCheck.genericPhrases.length,
-    });
+    const rawArticle = {
+      title: outline.title,
+      content,
+      slug: meta.slug,
+      excerpt: meta.excerpt,
+      metaTitle: meta.metaTitle,
+      metaDescription: meta.metaDescription,
+      keywords,
+      wordCount: rawWordCount,
+    };
 
-    // Step 11: Humanize article
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Humanizing article content`);
-    const humanizedArticle = await humanizerService.humanizeArticle(rawArticle);
+    // Step 6: Humanize content (single pass)
+    startStep(6, 'Humanizing article content');
+    const humanizedArticle = await humanizerService.humanizeSinglePass(rawArticle);
     log.info(`Humanized article: ${humanizedArticle.wordCount} words`);
+    endStep('Humanization');
 
-    // Step 12: Optimize readability
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Optimizing readability`);
+    // Step 7: Optimize readability
+    startStep(7, 'Optimizing readability');
     const { content: readableContent, initialScore, finalScore } = await readabilityService.enhanceReadability(humanizedArticle.content);
     humanizedArticle.content = readableContent;
     log.info('Readability optimization complete', {
@@ -174,59 +124,17 @@ async function runPipeline(): Promise<PipelineResult> {
       finalScore: finalScore.fleschReadingEase,
       level: finalScore.readabilityLevel,
     });
-
-    // Step 13: Generate FAQ
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Generating FAQ`);
-    let faqData: Array<{ question: string; answer: string }> = [];
-    try {
-      faqData = await openaiService.generateFAQs(
-        humanizedArticle.title,
-        humanizedArticle.content,
-        humanizedArticle.keywords
-      );
-      // Append FAQ HTML section to article content
-      const faqHtml = renderFAQSection(faqData);
-      if (faqHtml) {
-        humanizedArticle.content += '\n\n' + faqHtml;
-        log.info(`Added ${faqData.length} FAQ items to article`);
-      }
-    } catch (faqError) {
-      log.warn('Failed to generate FAQ, continuing without', faqError);
-    }
-
-    // Step 14: Generate table of contents
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Generating table of contents`);
-    try {
-      const { tocHtml, contentWithIds } = generateTableOfContents(humanizedArticle.content);
-      if (tocHtml) {
-        humanizedArticle.content = contentWithIds;
-        // Insert TOC after the first </p> (after introduction)
-        const firstParagraphEnd = humanizedArticle.content.indexOf('</p>');
-        if (firstParagraphEnd > 0) {
-          const insertPos = firstParagraphEnd + 4;
-          humanizedArticle.content =
-            humanizedArticle.content.slice(0, insertPos) +
-            '\n\n' + tocHtml + '\n\n' +
-            humanizedArticle.content.slice(insertPos);
-        }
-        log.info('Table of contents generated and inserted');
-      }
-    } catch (tocError) {
-      log.warn('Failed to generate table of contents, continuing without', tocError);
-    }
+    endStep('Readability optimization');
 
     // Ensure unique slug
     humanizedArticle.slug = await wordpressService.ensureUniqueSlug(
       humanizedArticle.slug
     );
 
-    // Step 15: Fetch featured image (if Unsplash is enabled)
+    // Step 8: Fetch featured image (if Unsplash is enabled)
     let featuredMediaId: number | undefined;
     if (unsplashService.isEnabled()) {
-      currentStep++;
-      log.info(`Step ${currentStep}/${totalSteps}: Fetching featured image`);
+      startStep(currentStep + 1, 'Fetching featured image');
       try {
         const imageData = await unsplashService.getFeaturedImage(
           humanizedArticle.keywords.primary,
@@ -234,7 +142,6 @@ async function runPipeline(): Promise<PipelineResult> {
         );
 
         if (imageData) {
-          // Upload to WordPress with alt text and caption
           const altText = `${humanizedArticle.keywords.primary} - ${humanizedArticle.title}`;
           const caption = `Photo by ${imageData.photographer} on Unsplash`;
           const media = await wordpressService.uploadMedia(
@@ -247,7 +154,6 @@ async function runPipeline(): Promise<PipelineResult> {
 
           featuredMediaId = media.id;
 
-          // Store attribution info in the article
           humanizedArticle.featuredImage = {
             url: media.url,
             photographer: imageData.photographer,
@@ -263,14 +169,13 @@ async function runPipeline(): Promise<PipelineResult> {
           log.warn('No suitable featured image found, continuing without');
         }
       } catch (imageError) {
-        // Non-critical failure - continue with publishing
         log.warn('Failed to fetch featured image, continuing without', imageError);
       }
+      endStep('Featured image');
     }
 
-    // Step 16: Add internal links (improved)
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Adding internal links`);
+    // Step 9: Internal links + Schema markup
+    startStep(currentStep + 1, 'Adding internal links and schema');
     try {
       const linkKeywords = [
         humanizedArticle.keywords.primary,
@@ -278,23 +183,7 @@ async function runPipeline(): Promise<PipelineResult> {
         ...humanizedArticle.keywords.lsiKeywords.slice(0, 3),
       ];
 
-      // Get cluster articles for priority linking
-      const clusterArticles = clusterService.getClusterArticles(clusterResult.clusterId);
       const relatedPosts = await wordpressService.getRelatedPosts(linkKeywords, humanizedArticle.slug);
-
-      // Add cluster articles as high-priority related posts (if not already found)
-      const existingSlugs = new Set(relatedPosts.map(p => p.slug));
-      for (const ca of clusterArticles) {
-        if (!existingSlugs.has(ca.slug) && ca.slug !== humanizedArticle.slug) {
-          relatedPosts.unshift({
-            id: 0,
-            title: ca.title,
-            slug: ca.slug,
-            link: ca.url,
-            relevanceScore: 0.9, // High priority for same-cluster articles
-          });
-        }
-      }
 
       if (relatedPosts.length > 0) {
         humanizedArticle.content = wordpressService.injectInternalLinks(
@@ -310,9 +199,7 @@ async function runPipeline(): Promise<PipelineResult> {
       log.warn('Failed to add internal links, continuing without', linkError);
     }
 
-    // Step 17: Generate schema markup (Article + FAQ + Breadcrumb)
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Generating schema markup`);
+    // Schema markup
     const postUrl = `${config.wordpress.url}/${humanizedArticle.slug}`;
     const articleSchema = schemaService.generateArticleSchema(humanizedArticle, {
       postUrl,
@@ -322,74 +209,42 @@ async function runPipeline(): Promise<PipelineResult> {
 
     const schemas: object[] = [articleSchema];
 
-    // Add FAQ schema if we have FAQ data
-    if (faqData.length > 0) {
-      const faqSchema = schemaService.generateFAQSchema(faqData);
-      schemas.push(faqSchema);
-      log.info('FAQ schema added');
-    }
-
-    // Add Breadcrumb schema
     const breadcrumbSchema = schemaService.generateBreadcrumbSchema([
       { name: 'Home', url: config.wordpress.url },
       { name: config.wordpress.category, url: `${config.wordpress.url}/category/${config.wordpress.category.toLowerCase().replace(/\s+/g, '-')}` },
       { name: humanizedArticle.title, url: postUrl },
     ]);
     schemas.push(breadcrumbSchema);
-    log.info('Breadcrumb schema added');
 
-    // Inject all schemas into content
     humanizedArticle.content = schemaService.injectMultipleSchemas(humanizedArticle.content, schemas);
     log.info('Schema markup generated and injected', {
       schemaCount: schemas.length,
     });
+    endStep('Internal links + schema');
 
-    // Step 18: Publish to WordPress
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Publishing to WordPress`);
+    // Step 10: Publish to WordPress
+    startStep(currentStep + 1, 'Publishing to WordPress');
     const post = await wordpressService.publishArticle(humanizedArticle, {
       featuredMediaId,
     });
-
-    // Update schema with actual post URL (re-inject if URL differs)
-    const schemaValidation = schemaService.validateSchema(articleSchema);
-    if (!schemaValidation.valid) {
-      log.warn('Schema validation issues', { errors: schemaValidation.errors });
-    }
-
-    // Step 19: Update topic cluster with published article
-    currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Updating topic cluster`);
-    try {
-      clusterService.addArticleToCluster(clusterResult.clusterId, {
-        title: humanizedArticle.title,
-        slug: humanizedArticle.slug,
-        url: post.link,
-        publishedAt: new Date().toISOString(),
-        keywords: [
-          humanizedArticle.keywords.primary,
-          ...humanizedArticle.keywords.secondary,
-        ],
-        contentType: clusterResult.contentType,
-      });
-      log.info('Topic cluster updated with new article');
-    } catch (clusterError) {
-      log.warn('Failed to update topic cluster, continuing', clusterError);
-    }
+    endStep('WordPress publish');
 
     const duration = Date.now() - startTime;
     const tokenUsage = openaiService.getTokenUsage();
 
-    log.info('Enhanced pipeline completed successfully', {
-      duration: `${(duration / 1000).toFixed(1)}s`,
+    // Log step timing breakdown
+    log.info('Step durations:');
+    for (const t of stepTimings) {
+      log.info(`  ${t.step}: ${t.duration}`);
+    }
+
+    log.info('Pipeline completed successfully', {
+      totalDuration: `${(duration / 1000).toFixed(1)}s`,
       postId: post.id,
       postUrl: post.link,
       totalTokens: tokenUsage.totalTokens,
       hasFeaturedImage: !!humanizedArticle.featuredImage,
-      hasFAQ: faqData.length > 0,
       readabilityScore: finalScore.fleschReadingEase,
-      originalityScore: originalityCheck.overallScore,
-      uniqueAngle: uniqueAngle.angle.substring(0, 50) + '...',
     });
 
     return {
@@ -397,12 +252,11 @@ async function runPipeline(): Promise<PipelineResult> {
       topic,
       article: humanizedArticle,
       postUrl: post.link,
-      keywordPlan,
     };
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     log.error('Pipeline failed', {
       duration: `${(duration / 1000).toFixed(1)}s`,
       error: errorMessage,

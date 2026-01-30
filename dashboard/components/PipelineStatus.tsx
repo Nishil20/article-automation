@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Zap,
@@ -15,40 +16,20 @@ import {
   Loader2,
   Clock,
   ExternalLink,
-  Users,
-  Fingerprint,
   BookOpen,
-  Link2,
-  Code2,
-  Network,
-  HelpCircle,
-  List,
-  AlertTriangle,
-  Target,
-  BarChart3,
+  Timer,
 } from 'lucide-react';
 
 type PipelineStep =
   | 'idle'
   | 'connecting'
   | 'trends'
-  | 'cluster'
-  | 'keyword_research'
-  | 'cannibalization'
-  | 'intent'
-  | 'keyword_scoring'
-  | 'competitors'
   | 'keywords'
   | 'outline'
   | 'content'
-  | 'originality'
   | 'humanize'
   | 'readability'
-  | 'faq'
-  | 'toc'
   | 'image'
-  | 'internal_links'
-  | 'schema'
   | 'publish'
   | 'complete'
   | 'failed';
@@ -67,31 +48,25 @@ const PHASES = [
     id: 'setup',
     label: 'Setup',
     icon: Zap,
-    steps: ['connecting'],
-  },
-  {
-    id: 'research',
-    label: 'Research',
-    icon: Search,
-    steps: ['trends', 'cluster', 'keyword_research', 'cannibalization', 'intent', 'keyword_scoring', 'competitors', 'keywords'],
+    steps: ['connecting', 'trends'],
   },
   {
     id: 'writing',
     label: 'Writing',
     icon: Sparkles,
-    steps: ['outline', 'content', 'originality', 'humanize', 'readability', 'faq', 'toc'],
+    steps: ['keywords', 'outline', 'content'],
   },
   {
     id: 'optimize',
     label: 'Optimize',
-    icon: Image,
-    steps: ['image', 'internal_links', 'schema'],
+    icon: Wand2,
+    steps: ['humanize', 'readability'],
   },
   {
     id: 'publish',
     label: 'Publish',
     icon: Send,
-    steps: ['publish'],
+    steps: ['image', 'publish'],
   },
 ] as const;
 
@@ -99,23 +74,12 @@ const PHASES = [
 const STEP_DETAILS: Record<string, { label: string; description: string; icon: typeof Zap }> = {
   connecting: { label: 'Connecting', description: 'WordPress connection', icon: Zap },
   trends: { label: 'Finding Topics', description: 'Analyzing trends', icon: Search },
-  cluster: { label: 'Clustering', description: 'Topic classification', icon: Network },
-  keyword_research: { label: 'Research', description: 'Keyword discovery', icon: Search },
-  cannibalization: { label: 'Overlap Check', description: 'Cannibalization scan', icon: AlertTriangle },
-  intent: { label: 'Intent', description: 'Search intent', icon: Target },
-  keyword_scoring: { label: 'Scoring', description: 'Keyword ranking', icon: BarChart3 },
-  competitors: { label: 'Analyzing', description: 'Competitor research', icon: Users },
   keywords: { label: 'Keywords', description: 'SEO optimization', icon: Key },
   outline: { label: 'Outlining', description: 'Article structure', icon: FileText },
   content: { label: 'Writing', description: 'Generating content', icon: Sparkles },
-  originality: { label: 'Checking', description: 'Originality scan', icon: Fingerprint },
   humanize: { label: 'Humanizing', description: 'Natural language', icon: Wand2 },
   readability: { label: 'Optimizing', description: 'Readability check', icon: BookOpen },
-  faq: { label: 'FAQ', description: 'Generating FAQ', icon: HelpCircle },
-  toc: { label: 'TOC', description: 'Table of contents', icon: List },
   image: { label: 'Image', description: 'Featured image', icon: Image },
-  internal_links: { label: 'Linking', description: 'Internal links', icon: Link2 },
-  schema: { label: 'Schema', description: 'SEO markup', icon: Code2 },
   publish: { label: 'Publishing', description: 'WordPress upload', icon: Send },
 };
 
@@ -134,19 +98,49 @@ function getPhaseStatus(phase: typeof PHASES[number], currentStep: PipelineStep)
   return 'pending';
 }
 
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
 export function PipelineStatus({ step, progress, message, topic, error }: PipelineStatusProps) {
   const isRunning = !['idle', 'complete', 'failed'].includes(step);
   const isComplete = step === 'complete';
   const isFailed = step === 'failed';
   const isIdle = step === 'idle';
 
+  // Elapsed timer
+  const startTimeRef = useRef<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (isRunning && !startTimeRef.current) {
+      startTimeRef.current = Date.now();
+    }
+    if (isIdle) {
+      startTimeRef.current = null;
+      setElapsed(0);
+    }
+  }, [isRunning, isIdle]);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const interval = setInterval(() => {
+      if (startTimeRef.current) {
+        setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isRunning]);
+
   // Extract URL from message if present
   const urlMatch = message.match(/(https?:\/\/[^\s]+)/);
   const publishedUrl = urlMatch ? urlMatch[1] : null;
 
   // Get current step details
-  const currentStepDetails = step !== 'idle' && step !== 'complete' && step !== 'failed' 
-    ? STEP_DETAILS[step] 
+  const currentStepDetails = step !== 'idle' && step !== 'complete' && step !== 'failed'
+    ? STEP_DETAILS[step]
     : null;
 
   return (
@@ -157,10 +151,16 @@ export function PipelineStatus({ step, progress, message, topic, error }: Pipeli
           <h2 className="text-lg font-semibold">Pipeline</h2>
           <div className="flex items-center gap-2">
             {isRunning && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                <span className="text-xs text-primary font-medium">Running</span>
-              </div>
+              <>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-full">
+                  <Timer className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-xs text-foreground font-mono font-medium tabular-nums">{formatElapsed(elapsed)}</span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                  <span className="text-xs text-primary font-medium">Running</span>
+                </div>
+              </>
             )}
             {isComplete && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 rounded-full">
@@ -253,6 +253,7 @@ export function PipelineStatus({ step, progress, message, topic, error }: Pipeli
               </div>
               <div className="text-right">
                 <span className="text-lg font-semibold text-primary">{Math.round(progress)}%</span>
+                <p className="text-[11px] text-muted-foreground font-mono tabular-nums">{formatElapsed(elapsed)}</p>
               </div>
             </div>
             <div className="mt-3 h-1.5 bg-secondary rounded-full overflow-hidden">
@@ -304,7 +305,12 @@ export function PipelineStatus({ step, progress, message, topic, error }: Pipeli
                   )}
                 </p>
               </div>
-              <span className="text-lg font-semibold text-green-500">100%</span>
+              <div className="text-right">
+                <span className="text-lg font-semibold text-green-500">100%</span>
+                {elapsed > 0 && (
+                  <p className="text-[11px] text-muted-foreground font-mono tabular-nums">{formatElapsed(elapsed)}</p>
+                )}
+              </div>
             </div>
           </div>
         )}

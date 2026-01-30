@@ -1,5 +1,82 @@
 [
   {
+    "id": "1769795936773-ax4s30vxw",
+    "topic": "Discovering...",
+    "title": "Nor'easter Bomb Cyclone: Live Updates and Impact on the Carolinas",
+    "slug": "noreaster-bomb-cyclone-carolinas",
+    "wordCount": 752,
+    "status": "published",
+    "createdAt": "2026-01-30T17:58:56.777Z",
+    "postUrl": "https://maketocreate.com/noreaster-bomb-cyclone-carolinas/",
+    "completedAt": "2026-01-30T18:02:00.699Z"
+  },
+  {
+    "id": "1769793097591-8qtqni3la",
+    "topic": "Discovering...",
+    "title": "",
+    "slug": "",
+    "wordCount": 0,
+    "status": "failed",
+    "createdAt": "2026-01-30T17:11:37.595Z",
+    "error": "fetch failed",
+    "completedAt": "2026-01-30T17:16:38.599Z"
+  },
+  {
+    "id": "1769789740335-m6clxwelb",
+    "topic": "Discovering...",
+    "title": "",
+    "slug": "",
+    "wordCount": 0,
+    "status": "failed",
+    "createdAt": "2026-01-30T16:15:40.339Z",
+    "error": "fetch failed",
+    "completedAt": "2026-01-30T16:20:41.342Z"
+  },
+  {
+    "id": "1769733079892-7nvrmo7jh",
+    "topic": "Discovering...",
+    "title": "",
+    "slug": "",
+    "wordCount": 0,
+    "status": "failed",
+    "createdAt": "2026-01-30T00:31:19.896Z",
+    "error": "fetch failed",
+    "completedAt": "2026-01-30T00:36:21.113Z"
+  },
+  {
+    "id": "1769732733106-2e9rmbyxi",
+    "topic": "Discovering...",
+    "title": "",
+    "slug": "",
+    "wordCount": 0,
+    "status": "failed",
+    "createdAt": "2026-01-30T00:25:33.110Z",
+    "error": "Pipeline cancelled or timed out",
+    "completedAt": "2026-01-30T00:25:36.907Z"
+  },
+  {
+    "id": "1769732677342-n1u7qfiee",
+    "topic": "Discovering...",
+    "title": "",
+    "slug": "",
+    "wordCount": 0,
+    "status": "failed",
+    "createdAt": "2026-01-30T00:24:37.342Z",
+    "error": "Pipeline cancelled or timed out",
+    "completedAt": "2026-01-30T00:24:39.488Z"
+  },
+  {
+    "id": "1769732658879-op97evhk1",
+    "topic": "Discovering...",
+    "title": "",
+    "slug": "",
+    "wordCount": 0,
+    "status": "failed",
+    "createdAt": "2026-01-30T00:24:18.879Z",
+    "error": "Pipeline cancelled or timed out",
+    "completedAt": "2026-01-30T00:24:27.150Z"
+  },
+  {
     "id": "1769730935404-sulfags5o",
     "topic": "Discovering...",
     "title": "Democrats vs Republicans: Historical Negotiation Strategies Shaping Today's Spending Deal",

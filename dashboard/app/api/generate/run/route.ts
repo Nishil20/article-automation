@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
 import { setStep, setTopic } from '@/lib/pipeline';
+import { setActiveChild } from '@/lib/child-process';
 
 export const maxDuration = 600; // 10 minutes max
 
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
         env,
         shell: true,
       });
+      setActiveChild(child);
 
       let output = '';
       let errorOutput = '';
@@ -60,44 +62,26 @@ export async function POST(request: NextRequest) {
           setStep('connecting', 'Testing WordPress connection...');
         } else if (text.includes('Discovering trending topic')) {
           setStep('trends', 'Discovering trending topic...');
-        } else if (text.includes('Classifying topic cluster')) {
-          setStep('cluster', 'Classifying topic cluster...');
-        } else if (text.includes('Researching keywords')) {
-          setStep('keyword_research', 'Researching keywords...');
-        } else if (text.includes('Checking keyword cannibalization')) {
-          setStep('cannibalization', 'Checking keyword overlap...');
-        } else if (text.includes('Classifying search intent')) {
-          setStep('intent', 'Classifying search intent...');
-        } else if (text.includes('Scoring and prioritizing keywords')) {
-          setStep('keyword_scoring', 'Scoring keywords...');
-        } else if (text.includes('Analyzing competitors')) {
-          setStep('competitors', 'Analyzing competitors...');
         } else if (text.includes('Generating keywords')) {
           setStep('keywords', 'Generating keywords...');
         } else if (text.includes('Generating outline')) {
           setStep('outline', 'Generating article outline...');
-        } else if (text.includes('Generating article content') || text.includes('Generating article with unique angle') || text.includes('Generating article with keyword plan')) {
+        } else if (text.includes('Generating article content')) {
           setStep('content', 'Writing article content...');
-        } else if (text.includes('Checking and improving originality')) {
-          setStep('originality', 'Checking originality...');
         } else if (text.includes('Humanizing article')) {
           setStep('humanize', 'Humanizing content...');
         } else if (text.includes('Optimizing readability')) {
           setStep('readability', 'Optimizing readability...');
-        } else if (text.includes('Generating FAQ')) {
-          setStep('faq', 'Generating FAQ...');
-        } else if (text.includes('Generating table of contents')) {
-          setStep('toc', 'Generating table of contents...');
         } else if (text.includes('Fetching featured image')) {
           setStep('image', 'Fetching featured image...');
         } else if (text.includes('Featured image uploaded')) {
           setStep('image', 'Featured image ready!');
         } else if (text.includes('Adding internal links')) {
-          setStep('internal_links', 'Adding internal links...');
-        } else if (text.includes('Generating schema markup')) {
-          setStep('schema', 'Generating schema markup...');
+          setStep('publish', 'Adding links and schema...');
         } else if (text.includes('Publishing to WordPress')) {
           setStep('publish', 'Publishing to WordPress...');
+        } else if (text.includes('pipeline completed successfully') || text.includes('SUCCESS')) {
+          setStep('publish', 'Done! Wrapping up...');
         } else if (text.includes('Selected topic:')) {
           const match = text.match(/Selected topic: (.+)/);
           if (match) setTopic(match[1].trim());
@@ -112,6 +96,7 @@ export async function POST(request: NextRequest) {
       });
 
       child.on('close', (code) => {
+        setActiveChild(null);
         if (code === 0) {
           // Strip ANSI codes from output for clean parsing
           const cleanOutput = stripAnsi(output);

@@ -139,7 +139,6 @@ export interface PipelineResult {
   topic?: TrendingTopic;
   article?: GeneratedArticle;
   postUrl?: string;
-  keywordPlan?: KeywordPlan;
   error?: string;
 }
 

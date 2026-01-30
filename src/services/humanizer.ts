@@ -333,6 +333,33 @@ while maintaining the same meaning and HTML structure.`;
   }
 
   /**
+   * Single-pass humanization: word replacement (local) + one AI humanize call.
+   * Much faster than the full humanizeArticle() pipeline.
+   */
+  async humanizeSinglePass(article: GeneratedArticle): Promise<GeneratedArticle> {
+    log.info(`Starting single-pass humanization for: ${article.title}`);
+
+    // Step 1: Quick deterministic word replacements (local, no API call)
+    let content = this.quickWordReplacement(article.content);
+
+    // Step 2: Single AI humanization pass (1 API call)
+    content = await this.humanize(content);
+
+    // Step 3: Strip any code blocks the AI might have wrapped around the HTML
+    content = this.stripCodeBlocks(content);
+
+    const wordCount = content.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(w => w.length > 0).length;
+
+    log.info(`Single-pass humanization complete: ${wordCount} words`);
+
+    return {
+      ...article,
+      content,
+      wordCount,
+    };
+  }
+
+  /**
    * Full humanization pipeline
    */
   async humanizeArticle(article: GeneratedArticle): Promise<GeneratedArticle> {

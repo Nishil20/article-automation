@@ -1,26 +1,16 @@
 import { addToHistory, updateHistoryRecord, generateId, type ArticleRecord } from './store';
+import { killActiveChild } from './child-process';
 
 export type PipelineStep =
   | 'idle'
   | 'connecting'
   | 'trends'
-  | 'cluster'
-  | 'keyword_research'
-  | 'cannibalization'
-  | 'intent'
-  | 'keyword_scoring'
-  | 'competitors'
   | 'keywords'
   | 'outline'
   | 'content'
-  | 'originality'
   | 'humanize'
   | 'readability'
-  | 'faq'
-  | 'toc'
   | 'image'
-  | 'internal_links'
-  | 'schema'
   | 'publish'
   | 'complete'
   | 'failed';
@@ -64,30 +54,19 @@ if (!globalForPipeline.__pipelineState) {
 // Reference the global state
 const state = globalForPipeline.__pipelineState;
 
-const STALE_TIMEOUT_MS = 12 * 60 * 1000; // 12 minutes - consider stale if running longer than max timeout
+const STALE_TIMEOUT_MS = 18 * 60 * 1000; // 18 minutes - consider stale if running longer than max timeout
 
 const STEP_PROGRESS: Record<PipelineStep, number> = {
   idle: 0,
-  connecting: 3,
-  trends: 6,
-  cluster: 9,
-  keyword_research: 13,
-  cannibalization: 17,
-  intent: 20,
-  keyword_scoring: 24,
-  competitors: 28,
-  keywords: 32,
-  outline: 36,
-  content: 42,
-  originality: 48,
-  humanize: 54,
-  readability: 60,
-  faq: 65,
-  toc: 69,
-  image: 73,
-  internal_links: 78,
-  schema: 84,
-  publish: 92,
+  connecting: 5,
+  trends: 12,
+  keywords: 22,
+  outline: 34,
+  content: 48,
+  humanize: 62,
+  readability: 72,
+  image: 80,
+  publish: 90,
   complete: 100,
   failed: 0,
 };
@@ -169,10 +148,11 @@ export async function runPipeline(options: {
     // Use absolute URL since this runs server-side
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     
-    // Add timeout of 10 minutes
+    // Add timeout of 15 minutes
     const timeoutId = setTimeout(() => {
+      killActiveChild();
       if (state.abortController) state.abortController.abort();
-    }, 10 * 60 * 1000);
+    }, 15 * 60 * 1000);
 
     log('Calling pipeline API...');
     
@@ -244,7 +224,8 @@ export async function runPipeline(options: {
     });
   } finally {
     state.abortController = null;
-    state.pipelineStartTime = null; // Clear start time
+    state.pipelineStartTime = null;
+    killActiveChild();
   }
 }
 
@@ -253,6 +234,7 @@ export function cancelPipeline(): void {
     state.abortController.abort();
     log('Pipeline cancelled by user');
   }
+  killActiveChild();
   resetPipeline();
 }
 

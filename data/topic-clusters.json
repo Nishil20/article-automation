@@ -257,5 +257,146 @@
     ],
     "createdAt": "2026-01-29T23:55:39.768Z",
     "updatedAt": "2026-01-30T00:00:24.363Z"
+  },
+  {
+    "id": "cluster_1769732663094_di6h06",
+    "pillarTopic": "Man poses as FBI agent to try to free Luigi Mangione from jail, source says - CNBC",
+    "keywords": [
+      "man",
+      "poses",
+      "fbi",
+      "agent",
+      "try",
+      "free",
+      "luigi",
+      "mangione",
+      "jail",
+      "source",
+      "says",
+      "cnbc"
+    ],
+    "articles": [],
+    "createdAt": "2026-01-30T00:24:23.094Z",
+    "updatedAt": "2026-01-30T00:24:23.094Z"
+  },
+  {
+    "id": "cluster_1769732681559_mp3vgc",
+    "pillarTopic": "Why Democrats won't rush to force Noem impeachment vote - Axios",
+    "keywords": [
+      "democrats",
+      "wont",
+      "rush",
+      "force",
+      "noem",
+      "impeachment",
+      "vote",
+      "axios",
+      "won"
+    ],
+    "articles": [],
+    "createdAt": "2026-01-30T00:24:41.559Z",
+    "updatedAt": "2026-01-30T00:24:41.559Z"
+  },
+  {
+    "id": "cluster_1769733084651_eeofzc",
+    "pillarTopic": "San Jose Mayor Matt Mahan Will Run for California Governor in 2026 - The New York Times",
+    "keywords": [
+      "san",
+      "jose",
+      "mayor",
+      "matt",
+      "mahan",
+      "run",
+      "california",
+      "governor",
+      "2026",
+      "new",
+      "york",
+      "times",
+      "santa claus",
+      "sanjay dutt",
+      "best sandwich near me",
+      "how to sanitize menstrual cup",
+      "how to santa claus",
+      "how to sanitize baby bottles"
+    ],
+    "articles": [
+      {
+        "title": "Santa Claus and Silicon Valley: How San Jose Mayor Matt Mahan’s 2026 Gubernatorial Run Could Transform California's Tech Industry",
+        "slug": "santa-claus-silicon-valley",
+        "url": "https://maketocreate.com/santa-claus-silicon-valley/",
+        "publishedAt": "2026-01-30T00:38:10.150Z",
+        "keywords": [
+          "santa claus",
+          "sanjay dutt",
+          "best sandwich near me",
+          "how to sanitize menstrual cup",
+          "how to santa claus",
+          "how to sanitize baby bottles"
+        ],
+        "contentType": "pillar"
+      }
+    ],
+    "createdAt": "2026-01-30T00:31:24.651Z",
+    "updatedAt": "2026-01-30T00:38:10.150Z"
+  },
+  {
+    "id": "cluster_1769789777516_rjjilg",
+    "pillarTopic": "Anti-ICE protests to be held across US as organizers urge national strike - The Guardian",
+    "keywords": [
+      "antiice",
+      "protests",
+      "held",
+      "across",
+      "organizers",
+      "urge",
+      "national",
+      "strike",
+      "guardian",
+      "how to de ice car without scraper",
+      "how to de ice windshield",
+      "how to de ice car",
+      "how to de ice",
+      "how to de ice windshield quickly",
+      "how to de ice driveway"
+    ],
+    "articles": [
+      {
+        "title": "How to De-Ice Your Car Without a Scraper: Insights from Anti-ICE Protesters' Personal Narratives",
+        "slug": "de-ice-car-without-scraper",
+        "url": "https://maketocreate.com/de-ice-car-without-scraper/",
+        "publishedAt": "2026-01-30T16:22:58.891Z",
+        "keywords": [
+          "how to de ice car without scraper",
+          "how to de ice windshield",
+          "how to de ice car",
+          "how to de ice",
+          "how to de ice windshield quickly",
+          "how to de ice driveway"
+        ],
+        "contentType": "pillar"
+      }
+    ],
+    "createdAt": "2026-01-30T16:16:17.516Z",
+    "updatedAt": "2026-01-30T16:22:58.891Z"
+  },
+  {
+    "id": "cluster_1769793121102_bfdzy3",
+    "pillarTopic": "Ukraine sees quieter night as Trump says Putin will not attack its cities - BBC",
+    "keywords": [
+      "ukraine",
+      "sees",
+      "quieter",
+      "night",
+      "trump",
+      "says",
+      "putin",
+      "attack",
+      "cities",
+      "bbc"
+    ],
+    "articles": [],
+    "createdAt": "2026-01-30T17:12:01.102Z",
+    "updatedAt": "2026-01-30T17:12:01.102Z"
   }
 ]
