@@ -94,6 +94,34 @@ Respond ONLY with valid JSON, no additional text.`;
 }
 
 /**
+ * Expand a broad niche into specific seed topics for keyword research
+ */
+export function getNicheExpansionPrompt(niche: string): string {
+  return `You are an SEO keyword research expert specializing in finding low-competition content opportunities.
+
+NICHE: "${niche}"
+
+Generate 5-8 specific seed topics within this niche that are likely to have LOW competition. Focus on:
+1. Long-tail angles that big sites overlook
+2. Beginner-friendly "how to" sub-topics
+3. Niche-specific problems or questions
+4. Comparison/alternative angles
+5. Emerging trends or underserved sub-niches
+
+Each seed should be a 2-5 word phrase suitable for keyword research (not a full article title).
+
+Generate a JSON response:
+{
+  "seeds": [
+    "seed topic 1",
+    "seed topic 2"
+  ]
+}
+
+Respond ONLY with valid JSON, no additional text.`;
+}
+
+/**
  * Analyze keyword cannibalization risk for multiple candidates against existing content (batched)
  */
 export function getCannibalizationAnalysisPrompt(

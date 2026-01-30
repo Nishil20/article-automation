@@ -15,6 +15,7 @@ import {
   getIntentClassificationPrompt,
   getLongTailExpansionPrompt,
   getCannibalizationAnalysisPrompt,
+  getNicheExpansionPrompt,
 } from '../prompts/keyword-research.js';
 import { GoogleAutocompleteProvider } from './providers/index.js';
 import { logger } from '../utils/logger.js';
@@ -78,6 +79,21 @@ export class KeywordResearchService {
     cleaned = cleaned.replace(/\n?`{3,}\s*$/, '');
     cleaned = cleaned.replace(/^\s*`{3,}\s*$/gm, '');
     return JSON.parse(cleaned.trim()) as T;
+  }
+
+  /**
+   * Expand a broad niche into specific seed topics for keyword research
+   */
+  async expandNicheToSeeds(niche: string): Promise<string[]> {
+    log.info(`Expanding niche to seed topics: "${niche}"`);
+
+    const prompt = getNicheExpansionPrompt(niche);
+    const response = await this.complete(prompt, 0.7);
+    const parsed = this.parseJSON<{ seeds: string[] }>(response);
+
+    const seeds = parsed.seeds.slice(0, 8);
+    log.info(`Generated ${seeds.length} seed topics from niche`);
+    return seeds;
   }
 
   /**
