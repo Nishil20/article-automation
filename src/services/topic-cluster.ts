@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import OpenAI from 'openai';
 import { TopicCluster, ClusterArticle } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 
@@ -8,7 +9,9 @@ const log = logger.child('TopicCluster');
 const DATA_DIR = path.join(process.cwd(), 'data');
 const CLUSTERS_FILE = path.join(DATA_DIR, 'topic-clusters.json');
 
-interface ClusterClassification {
+const EMBEDDING_SIMILARITY_THRESHOLD = 0.75;
+
+export interface ClusterClassification {
   clusterId: string;
   contentType: 'pillar' | 'cluster';
   isNew: boolean;
@@ -16,8 +19,12 @@ interface ClusterClassification {
 
 export class TopicClusterService {
   private clusters: TopicCluster[] = [];
+  private openaiClient: OpenAI | null = null;
 
-  constructor() {
+  constructor(openaiConfig?: { apiKey: string }) {
+    if (openaiConfig) {
+      this.openaiClient = new OpenAI({ apiKey: openaiConfig.apiKey });
+    }
     this.loadClusters();
   }
 
@@ -159,6 +166,102 @@ export class TopicClusterService {
    */
   getCluster(clusterId: string): TopicCluster | undefined {
     return this.clusters.find(c => c.id === clusterId);
+  }
+
+  /**
+   * Classify a topic using embeddings for more accurate similarity matching.
+   * Falls back to Jaccard-based classifyTopic() if embeddings fail or no OpenAI config.
+   */
+  async classifyTopicWithEmbeddings(topic: string, relatedQueries: string[]): Promise<ClusterClassification> {
+    if (!this.openaiClient || this.clusters.length === 0) {
+      log.info('Embeddings not available or no clusters, falling back to keyword matching');
+      return this.classifyTopic(topic, relatedQueries);
+    }
+
+    try {
+      const topicText = [topic, ...relatedQueries.slice(0, 5)].join(' ');
+      const topicEmbedding = await this.getEmbedding(topicText);
+
+      let bestMatch: { cluster: TopicCluster; score: number } | null = null;
+
+      for (const cluster of this.clusters) {
+        const clusterText = [
+          cluster.pillarTopic,
+          ...cluster.keywords.slice(0, 10),
+        ].join(' ');
+        const clusterEmbedding = await this.getEmbedding(clusterText);
+        const score = this.cosineSimilarity(topicEmbedding, clusterEmbedding);
+
+        if (score > EMBEDDING_SIMILARITY_THRESHOLD && (!bestMatch || score > bestMatch.score)) {
+          bestMatch = { cluster, score };
+        }
+      }
+
+      if (bestMatch) {
+        const hasPillar = bestMatch.cluster.articles.some(a => a.contentType === 'pillar');
+        const contentType: 'pillar' | 'cluster' = hasPillar ? 'cluster' : 'pillar';
+
+        log.info(`Embedding match to cluster: "${bestMatch.cluster.pillarTopic}" (cosine: ${bestMatch.score.toFixed(3)})`);
+
+        // Update cluster keywords
+        const topicWords = this.extractKeywords(topic);
+        const allWords = [
+          ...topicWords,
+          ...relatedQueries.flatMap(q => this.extractKeywords(q)),
+        ];
+        const newKeywords = allWords.filter(w => !bestMatch!.cluster.keywords.includes(w));
+        if (newKeywords.length > 0) {
+          bestMatch.cluster.keywords.push(...newKeywords.slice(0, 10));
+          bestMatch.cluster.updatedAt = new Date().toISOString();
+          this.saveClusters();
+        }
+
+        return {
+          clusterId: bestMatch.cluster.id,
+          contentType,
+          isNew: false,
+        };
+      }
+
+      // No embedding match, create new cluster (same as classifyTopic fallback)
+      log.info('No embedding match found, creating new cluster');
+      return this.classifyTopic(topic, relatedQueries);
+    } catch (error) {
+      log.warn('Embedding classification failed, falling back to keyword matching', error);
+      return this.classifyTopic(topic, relatedQueries);
+    }
+  }
+
+  /**
+   * Get embedding vector for text using text-embedding-3-small
+   */
+  private async getEmbedding(text: string): Promise<number[]> {
+    if (!this.openaiClient) {
+      throw new Error('OpenAI client not configured for embeddings');
+    }
+
+    const response = await this.openaiClient.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: text,
+    });
+
+    return response.data[0].embedding;
+  }
+
+  /**
+   * Calculate cosine similarity between two vectors
+   */
+  private cosineSimilarity(a: number[], b: number[]): number {
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dotProduct += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+    return denominator === 0 ? 0 : dotProduct / denominator;
   }
 
   /**

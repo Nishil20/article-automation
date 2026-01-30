@@ -5,6 +5,10 @@ export type PipelineStep =
   | 'connecting'
   | 'trends'
   | 'cluster'
+  | 'keyword_research'
+  | 'cannibalization'
+  | 'intent'
+  | 'keyword_scoring'
   | 'competitors'
   | 'keywords'
   | 'outline'
@@ -60,23 +64,27 @@ if (!globalForPipeline.__pipelineState) {
 // Reference the global state
 const state = globalForPipeline.__pipelineState;
 
-const STALE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes - consider stale if running longer
+const STALE_TIMEOUT_MS = 12 * 60 * 1000; // 12 minutes - consider stale if running longer than max timeout
 
 const STEP_PROGRESS: Record<PipelineStep, number> = {
   idle: 0,
   connecting: 3,
-  trends: 7,
-  cluster: 11,
-  competitors: 15,
-  keywords: 20,
-  outline: 26,
-  content: 34,
-  originality: 42,
-  humanize: 50,
-  readability: 56,
-  faq: 62,
-  toc: 66,
-  image: 72,
+  trends: 6,
+  cluster: 9,
+  keyword_research: 13,
+  cannibalization: 17,
+  intent: 20,
+  keyword_scoring: 24,
+  competitors: 28,
+  keywords: 32,
+  outline: 36,
+  content: 42,
+  originality: 48,
+  humanize: 54,
+  readability: 60,
+  faq: 65,
+  toc: 69,
+  image: 73,
   internal_links: 78,
   schema: 84,
   publish: 92,
@@ -161,10 +169,10 @@ export async function runPipeline(options: {
     // Use absolute URL since this runs server-side
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     
-    // Add timeout of 5 minutes
+    // Add timeout of 10 minutes
     const timeoutId = setTimeout(() => {
       if (state.abortController) state.abortController.abort();
-    }, 5 * 60 * 1000);
+    }, 10 * 60 * 1000);
 
     log('Calling pipeline API...');
     

@@ -139,6 +139,7 @@ export interface PipelineResult {
   topic?: TrendingTopic;
   article?: GeneratedArticle;
   postUrl?: string;
+  keywordPlan?: KeywordPlan;
   error?: string;
 }
 
@@ -242,4 +243,52 @@ export interface ClusterArticle {
   publishedAt: string;
   keywords: string[];
   contentType: 'pillar' | 'cluster';
+}
+
+// ============================================
+// Keyword Research Types
+// ============================================
+
+export type SearchIntent = 'informational' | 'transactional' | 'navigational' | 'commercial';
+
+export interface KeywordSuggestion {
+  keyword: string;
+  source: string;
+}
+
+export interface KeywordMetrics {
+  keyword: string;
+  estimatedVolume: 'high' | 'medium' | 'low' | 'very_low';
+  estimatedDifficulty: number;  // 0-100
+  intent: SearchIntent;
+  trend: 'rising' | 'stable' | 'declining';
+  source: string;
+}
+
+export interface CannibalizationResult {
+  keyword: string;
+  overlappingArticles: Array<{
+    title: string;
+    slug: string;
+    similarity: number;
+    matchedKeywords: string[];
+  }>;
+  isCannibalized: boolean;
+  suggestedLongTails: string[];
+}
+
+export interface KeywordPlan {
+  primary: KeywordMetrics;
+  secondary: KeywordMetrics[];
+  longTails: string[];
+  intentProfile: SearchIntent;
+  cannibalizationReport: CannibalizationResult[];
+  score: number;
+}
+
+export interface KeywordDataProvider {
+  name: string;
+  getKeywordSuggestions(seed: string): Promise<KeywordSuggestion[]>;
+  getKeywordMetrics?(keywords: string[]): Promise<KeywordMetrics[]>;
+  isAvailable(): boolean;
 }

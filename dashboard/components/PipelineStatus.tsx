@@ -23,6 +23,9 @@ import {
   Network,
   HelpCircle,
   List,
+  AlertTriangle,
+  Target,
+  BarChart3,
 } from 'lucide-react';
 
 type PipelineStep =
@@ -30,6 +33,10 @@ type PipelineStep =
   | 'connecting'
   | 'trends'
   | 'cluster'
+  | 'keyword_research'
+  | 'cannibalization'
+  | 'intent'
+  | 'keyword_scoring'
   | 'competitors'
   | 'keywords'
   | 'outline'
@@ -66,7 +73,7 @@ const PHASES = [
     id: 'research',
     label: 'Research',
     icon: Search,
-    steps: ['trends', 'cluster', 'competitors', 'keywords'],
+    steps: ['trends', 'cluster', 'keyword_research', 'cannibalization', 'intent', 'keyword_scoring', 'competitors', 'keywords'],
   },
   {
     id: 'writing',
@@ -93,6 +100,10 @@ const STEP_DETAILS: Record<string, { label: string; description: string; icon: t
   connecting: { label: 'Connecting', description: 'WordPress connection', icon: Zap },
   trends: { label: 'Finding Topics', description: 'Analyzing trends', icon: Search },
   cluster: { label: 'Clustering', description: 'Topic classification', icon: Network },
+  keyword_research: { label: 'Research', description: 'Keyword discovery', icon: Search },
+  cannibalization: { label: 'Overlap Check', description: 'Cannibalization scan', icon: AlertTriangle },
+  intent: { label: 'Intent', description: 'Search intent', icon: Target },
+  keyword_scoring: { label: 'Scoring', description: 'Keyword ranking', icon: BarChart3 },
   competitors: { label: 'Analyzing', description: 'Competitor research', icon: Users },
   keywords: { label: 'Keywords', description: 'SEO optimization', icon: Key },
   outline: { label: 'Outlining', description: 'Article structure', icon: FileText },

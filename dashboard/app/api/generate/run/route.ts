@@ -3,7 +3,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import { setStep, setTopic } from '@/lib/pipeline';
 
-export const maxDuration = 300; // 5 minutes max
+export const maxDuration = 600; // 10 minutes max
 
 // Strip ANSI escape codes from terminal output
 function stripAnsi(text: string): string {
@@ -62,13 +62,21 @@ export async function POST(request: NextRequest) {
           setStep('trends', 'Discovering trending topic...');
         } else if (text.includes('Classifying topic cluster')) {
           setStep('cluster', 'Classifying topic cluster...');
+        } else if (text.includes('Researching keywords')) {
+          setStep('keyword_research', 'Researching keywords...');
+        } else if (text.includes('Checking keyword cannibalization')) {
+          setStep('cannibalization', 'Checking keyword overlap...');
+        } else if (text.includes('Classifying search intent')) {
+          setStep('intent', 'Classifying search intent...');
+        } else if (text.includes('Scoring and prioritizing keywords')) {
+          setStep('keyword_scoring', 'Scoring keywords...');
         } else if (text.includes('Analyzing competitors')) {
           setStep('competitors', 'Analyzing competitors...');
         } else if (text.includes('Generating keywords')) {
           setStep('keywords', 'Generating keywords...');
         } else if (text.includes('Generating outline')) {
           setStep('outline', 'Generating article outline...');
-        } else if (text.includes('Generating article content') || text.includes('Generating article with unique angle')) {
+        } else if (text.includes('Generating article content') || text.includes('Generating article with unique angle') || text.includes('Generating article with keyword plan')) {
           setStep('content', 'Writing article content...');
         } else if (text.includes('Checking and improving originality')) {
           setStep('originality', 'Checking originality...');

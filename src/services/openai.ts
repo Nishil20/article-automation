@@ -7,6 +7,7 @@ import {
   TrendingTopic,
   CompetitorAnalysis,
   UniqueAngle,
+  KeywordPlan,
 } from '../types/index.js';
 import {
   SYSTEM_PROMPT,
@@ -501,6 +502,65 @@ export class OpenAIService {
 
     log.info(`Generated ${parsed.faqs.length} FAQ items`);
     return parsed.faqs;
+  }
+
+  /**
+   * Generate article using an external keyword plan and competitor analysis.
+   * This avoids the double competitor-analysis that generateArticleEnhanced performs
+   * when competitors were already analyzed as a separate pipeline step.
+   */
+  async generateArticleWithKeywordPlan(
+    topic: TrendingTopic,
+    keywordPlan: KeywordPlan,
+    competitorAnalysis: CompetitorAnalysis
+  ): Promise<{
+    article: GeneratedArticle;
+    uniqueAngle: UniqueAngle;
+  }> {
+    log.info(`Starting article generation with keyword plan for: ${topic.title}`);
+
+    // Convert KeywordPlan → ArticleKeywords
+    const keywords: ArticleKeywords = {
+      primary: keywordPlan.primary.keyword,
+      secondary: keywordPlan.secondary.map(s => s.keyword),
+      lsiKeywords: keywordPlan.longTails.slice(0, 8),
+    };
+
+    // Step 1: Generate unique angle (uses existing competitor analysis)
+    const uniqueAngle = await this.generateUniqueAngle(topic, competitorAnalysis, keywords);
+
+    // Step 2: Generate outline with angle
+    const outline = await this.generateOutlineWithAngle(topic, keywords, uniqueAngle);
+
+    // Step 3: Generate content section-by-section
+    const content = await this.generateContentBySection(outline, keywords);
+
+    // Step 4: Generate meta
+    const meta = await this.generateMeta(outline.title, content, keywords);
+
+    const wordCount = this.countWords(content);
+
+    log.info('Article generation with keyword plan complete', {
+      title: outline.title,
+      wordCount,
+      primaryKeyword: keywords.primary,
+      uniqueAngle: uniqueAngle.angle.substring(0, 50) + '...',
+      totalTokens: this.totalUsage.totalTokens,
+    });
+
+    return {
+      article: {
+        title: outline.title,
+        content,
+        slug: meta.slug,
+        excerpt: meta.excerpt,
+        metaTitle: meta.metaTitle,
+        metaDescription: meta.metaDescription,
+        keywords,
+        wordCount,
+      },
+      uniqueAngle,
+    };
   }
 
   /**

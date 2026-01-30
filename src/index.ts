@@ -8,6 +8,7 @@ import { UnsplashService } from './services/unsplash.js';
 import { ReadabilityService } from './services/readability.js';
 import { SchemaService } from './services/schema.js';
 import { TopicClusterService } from './services/topic-cluster.js';
+import { KeywordResearchService } from './services/keyword-research.js';
 import { PipelineResult } from './types/index.js';
 import { renderFAQSection, generateTableOfContents } from './utils/content.js';
 
@@ -33,10 +34,11 @@ async function runPipeline(): Promise<PipelineResult> {
     const unsplashService = new UnsplashService(config.unsplash);
     const readabilityService = new ReadabilityService(config);
     const schemaService = new SchemaService(config.wordpress);
-    const clusterService = new TopicClusterService();
+    const clusterService = new TopicClusterService({ apiKey: config.openai.apiKey });
+    const keywordService = new KeywordResearchService(config);
 
-    // Calculate total steps (base: 15, +1 if Unsplash enabled)
-    const totalSteps = unsplashService.isEnabled() ? 16 : 15;
+    // Calculate total steps (base: 19, +1 if Unsplash enabled)
+    const totalSteps = unsplashService.isEnabled() ? 20 : 19;
     let currentStep = 0;
 
     // Step 1: Test WordPress connection
@@ -58,17 +60,74 @@ async function runPipeline(): Promise<PipelineResult> {
       relatedQueries: topic.relatedQueries.slice(0, 5),
     });
 
-    // Step 3: Classify topic cluster
+    // Step 3: Classify topic cluster (with embeddings, falls back to Jaccard)
     currentStep++;
     log.info(`Step ${currentStep}/${totalSteps}: Classifying topic cluster`);
-    const clusterResult = clusterService.classifyTopic(topic.title, topic.relatedQueries);
+    let clusterResult;
+    try {
+      clusterResult = await clusterService.classifyTopicWithEmbeddings(topic.title, topic.relatedQueries);
+    } catch (clusterError) {
+      log.warn('Embedding classification failed, falling back to keyword matching', clusterError);
+      clusterResult = clusterService.classifyTopic(topic.title, topic.relatedQueries);
+    }
     log.info('Topic cluster classification', {
       clusterId: clusterResult.clusterId,
       contentType: clusterResult.contentType,
       isNewCluster: clusterResult.isNew,
     });
 
-    // Step 4: Analyze competitors
+    // Step 4: Research keywords
+    currentStep++;
+    log.info(`Step ${currentStep}/${totalSteps}: Researching keywords`);
+    const keywordCandidates = await keywordService.researchKeywords(topic.title, topic.relatedQueries);
+    log.info(`Keyword research complete: ${keywordCandidates.length} candidates`);
+
+    // Step 5: Check keyword cannibalization (non-critical)
+    currentStep++;
+    log.info(`Step ${currentStep}/${totalSteps}: Checking keyword cannibalization`);
+    let cannibalizationResults;
+    try {
+      cannibalizationResults = await keywordService.checkCannibalization(keywordCandidates);
+      const cannibalizedCount = cannibalizationResults.filter(r => r.isCannibalized).length;
+      log.info(`Cannibalization check: ${cannibalizedCount} overlapping keywords found`);
+    } catch (cannError) {
+      log.warn('Cannibalization check failed, continuing without', cannError);
+      cannibalizationResults = keywordCandidates.map(c => ({
+        keyword: c.keyword,
+        overlappingArticles: [] as Array<{ title: string; slug: string; similarity: number; matchedKeywords: string[] }>,
+        isCannibalized: false,
+        suggestedLongTails: [] as string[],
+      }));
+    }
+
+    // Step 6: Classify search intent (non-critical)
+    currentStep++;
+    log.info(`Step ${currentStep}/${totalSteps}: Classifying search intent`);
+    let classifiedKeywords;
+    try {
+      classifiedKeywords = await keywordService.classifyIntent(keywordCandidates);
+      log.info('Search intent classification complete');
+    } catch (intentError) {
+      log.warn('Intent classification failed, defaulting to informational', intentError);
+      classifiedKeywords = keywordCandidates;
+    }
+
+    // Step 7: Score and prioritize keywords (critical gate)
+    currentStep++;
+    log.info(`Step ${currentStep}/${totalSteps}: Scoring and prioritizing keywords`);
+    const keywordPlan = keywordService.scoreAndPrioritize(classifiedKeywords, cannibalizationResults);
+    log.info(`Keyword plan: primary="${keywordPlan.primary.keyword}" (score: ${keywordPlan.score.toFixed(1)})`);
+
+    // Expand long-tails (non-critical)
+    try {
+      keywordPlan.longTails = await keywordService.expandLongTails(keywordPlan.primary.keyword);
+      log.info(`Expanded ${keywordPlan.longTails.length} long-tail keywords`);
+    } catch (ltError) {
+      log.warn('Long-tail expansion failed, continuing without', ltError);
+      keywordPlan.longTails = [];
+    }
+
+    // Step 8: Analyze competitors
     currentStep++;
     log.info(`Step ${currentStep}/${totalSteps}: Analyzing competitors`);
     const competitorAnalysis = await openaiService.analyzeCompetitors(topic);
@@ -77,15 +136,19 @@ async function runPipeline(): Promise<PipelineResult> {
       uniqueOpportunities: competitorAnalysis.uniqueOpportunities.length,
     });
 
-    // Step 5: Generate article with unique angle (section-by-section)
+    // Step 9: Generate article with keyword plan (uses external competitor analysis)
     currentStep++;
-    log.info(`Step ${currentStep}/${totalSteps}: Generating article with unique angle`);
-    const { article: rawArticle, uniqueAngle } = await openaiService.generateArticleEnhanced(topic);
+    log.info(`Step ${currentStep}/${totalSteps}: Generating article with keyword plan`);
+    const { article: rawArticle, uniqueAngle } = await openaiService.generateArticleWithKeywordPlan(
+      topic,
+      keywordPlan,
+      competitorAnalysis
+    );
     log.info(`Raw article generated: ${rawArticle.wordCount} words`, {
       uniqueAngle: uniqueAngle.angle.substring(0, 80) + '...',
     });
 
-    // Step 6: Check and improve originality
+    // Step 10: Check and improve originality
     currentStep++;
     log.info(`Step ${currentStep}/${totalSteps}: Checking and improving originality`);
     const { content: originalContent, originalityCheck } = await humanizerService.enhanceOriginality(rawArticle.content);
@@ -95,13 +158,13 @@ async function runPipeline(): Promise<PipelineResult> {
       genericPhrasesFound: originalityCheck.genericPhrases.length,
     });
 
-    // Step 7: Humanize article
+    // Step 11: Humanize article
     currentStep++;
     log.info(`Step ${currentStep}/${totalSteps}: Humanizing article content`);
     const humanizedArticle = await humanizerService.humanizeArticle(rawArticle);
     log.info(`Humanized article: ${humanizedArticle.wordCount} words`);
 
-    // Step 8: Optimize readability
+    // Step 12: Optimize readability
     currentStep++;
     log.info(`Step ${currentStep}/${totalSteps}: Optimizing readability`);
     const { content: readableContent, initialScore, finalScore } = await readabilityService.enhanceReadability(humanizedArticle.content);
@@ -112,7 +175,7 @@ async function runPipeline(): Promise<PipelineResult> {
       level: finalScore.readabilityLevel,
     });
 
-    // Step 9: Generate FAQ
+    // Step 13: Generate FAQ
     currentStep++;
     log.info(`Step ${currentStep}/${totalSteps}: Generating FAQ`);
     let faqData: Array<{ question: string; answer: string }> = [];
@@ -132,7 +195,7 @@ async function runPipeline(): Promise<PipelineResult> {
       log.warn('Failed to generate FAQ, continuing without', faqError);
     }
 
-    // Step 10: Generate table of contents
+    // Step 14: Generate table of contents
     currentStep++;
     log.info(`Step ${currentStep}/${totalSteps}: Generating table of contents`);
     try {
@@ -159,7 +222,7 @@ async function runPipeline(): Promise<PipelineResult> {
       humanizedArticle.slug
     );
 
-    // Step 11: Fetch featured image (if Unsplash is enabled)
+    // Step 15: Fetch featured image (if Unsplash is enabled)
     let featuredMediaId: number | undefined;
     if (unsplashService.isEnabled()) {
       currentStep++;
@@ -205,7 +268,7 @@ async function runPipeline(): Promise<PipelineResult> {
       }
     }
 
-    // Step 12: Add internal links (improved)
+    // Step 16: Add internal links (improved)
     currentStep++;
     log.info(`Step ${currentStep}/${totalSteps}: Adding internal links`);
     try {
@@ -247,7 +310,7 @@ async function runPipeline(): Promise<PipelineResult> {
       log.warn('Failed to add internal links, continuing without', linkError);
     }
 
-    // Step 13: Generate schema markup (Article + FAQ + Breadcrumb)
+    // Step 17: Generate schema markup (Article + FAQ + Breadcrumb)
     currentStep++;
     log.info(`Step ${currentStep}/${totalSteps}: Generating schema markup`);
     const postUrl = `${config.wordpress.url}/${humanizedArticle.slug}`;
@@ -281,7 +344,7 @@ async function runPipeline(): Promise<PipelineResult> {
       schemaCount: schemas.length,
     });
 
-    // Step 14: Publish to WordPress
+    // Step 18: Publish to WordPress
     currentStep++;
     log.info(`Step ${currentStep}/${totalSteps}: Publishing to WordPress`);
     const post = await wordpressService.publishArticle(humanizedArticle, {
@@ -294,7 +357,7 @@ async function runPipeline(): Promise<PipelineResult> {
       log.warn('Schema validation issues', { errors: schemaValidation.errors });
     }
 
-    // Step 15: Update topic cluster with published article
+    // Step 19: Update topic cluster with published article
     currentStep++;
     log.info(`Step ${currentStep}/${totalSteps}: Updating topic cluster`);
     try {
@@ -334,6 +397,7 @@ async function runPipeline(): Promise<PipelineResult> {
       topic,
       article: humanizedArticle,
       postUrl: post.link,
+      keywordPlan,
     };
   } catch (error) {
     const duration = Date.now() - startTime;
