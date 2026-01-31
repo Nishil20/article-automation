@@ -3,6 +3,7 @@ import Parser from 'rss-parser';
 import OpenAI from 'openai';
 import { TrendingTopic, Config } from '../types/index.js';
 import { logger } from '../utils/logger.js';
+import { checkTopicSimilarity, getRecentArticleTitles, RecentArticle } from '../utils/topic-diversity.js';
 
 const log = logger.child('Trends');
 
@@ -103,10 +104,12 @@ export class TrendsService {
   private config: Config['trends'];
   private openaiClient: OpenAI | null = null;
   private openaiModel: string = 'gpt-4o';
+  private diversityConfig: Config['diversity'] | null = null;
+  private recentHistory: RecentArticle[] = [];
 
   constructor(config: Config['trends'], openaiConfig?: Config['openai']) {
     this.config = config;
-    
+
     // Initialize OpenAI client if config provided
     if (openaiConfig?.apiKey) {
       this.openaiClient = new OpenAI({
@@ -114,6 +117,33 @@ export class TrendsService {
       });
       this.openaiModel = openaiConfig.model || 'gpt-4o';
     }
+  }
+
+  setDiversityConfig(config: Config['diversity']): void {
+    this.diversityConfig = config;
+  }
+
+  setRecentHistory(history: RecentArticle[]): void {
+    this.recentHistory = history;
+  }
+
+  /**
+   * Check whether a candidate topic is diverse enough from recent history.
+   */
+  private isTopicDiverse(topic: TrendingTopic): boolean {
+    if (!this.diversityConfig || this.recentHistory.length === 0) {
+      return true;
+    }
+    const result = checkTopicSimilarity(
+      topic.title,
+      topic.relatedQueries,
+      this.recentHistory,
+      this.diversityConfig.similarityThreshold
+    );
+    if (result.isTooSimilar) {
+      log.info(`Topic rejected (similarity: ${result.highestScore.toFixed(2)} >= ${this.diversityConfig.similarityThreshold}): "${topic.title}" too similar to "${result.mostSimilarTitle}"`);
+    }
+    return !result.isTooSimilar;
   }
 
   /**
@@ -175,6 +205,12 @@ export class TrendsService {
     // Also include general feeds if category-specific
     if (categoryKey !== 'general') {
       feeds.push(...RSS_FEEDS.general.slice(0, 1));
+    }
+
+    // Append user-configured custom feeds
+    if (this.config.customFeeds && this.config.customFeeds.length > 0) {
+      feeds.push(...this.config.customFeeds);
+      log.info(`Added ${this.config.customFeeds.length} custom feeds to pool`);
     }
 
     log.info(`Fetching RSS topics from ${feeds.length} feeds (category: ${categoryKey})`);
@@ -363,10 +399,21 @@ export class TrendsService {
         try {
           const rssTopics = await this.getRSSTopics(category);
           if (rssTopics.length > 0) {
-            const topTopics = rssTopics.slice(0, 5);
-            const topic = topTopics[Math.floor(Math.random() * topTopics.length)];
-            log.info(`Selected RSS topic for article: ${topic.title}`);
-            return topic;
+            // Shuffle candidates for variety
+            const maxCandidates = this.diversityConfig?.maxCandidates ?? 10;
+            const candidates = rssTopics.slice(0, maxCandidates);
+            for (let i = candidates.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+            }
+            // Return first candidate that passes diversity check
+            for (const candidate of candidates) {
+              if (this.isTopicDiverse(candidate)) {
+                log.info(`Selected RSS topic for article: ${candidate.title}`);
+                return candidate;
+              }
+            }
+            log.info('All RSS candidates rejected by diversity filter');
           }
         } catch (error) {
           log.warn('RSS feeds unavailable', error);
@@ -383,17 +430,21 @@ export class TrendsService {
           }
 
           if (topics.length > 0) {
-            const topic = topics[0];
-            
-            if (topic.relatedQueries.length < 5) {
-              const additionalQueries = await this.getRelatedQueries(topic.title);
-              topic.relatedQueries = [
-                ...new Set([...topic.relatedQueries, ...additionalQueries]),
-              ];
-            }
+            // Check each topic against diversity filter
+            for (const topic of topics) {
+              if (topic.relatedQueries.length < 5) {
+                const additionalQueries = await this.getRelatedQueries(topic.title);
+                topic.relatedQueries = [
+                  ...new Set([...topic.relatedQueries, ...additionalQueries]),
+                ];
+              }
 
-            log.info(`Selected Google Trends topic for article: ${topic.title}`);
-            return topic;
+              if (this.isTopicDiverse(topic)) {
+                log.info(`Selected Google Trends topic for article: ${topic.title}`);
+                return topic;
+              }
+            }
+            log.info('All Google Trends candidates rejected by diversity filter');
           }
         } catch (error) {
           log.warn('Google Trends unavailable', error);
@@ -403,17 +454,35 @@ export class TrendsService {
       case 'openai':
         try {
           log.info('Trying OpenAI for topic generation...');
-          const openaiTopic = await this.getOpenAITopic(category);
-          if (openaiTopic) {
+          const recentTitlesStr = getRecentArticleTitles(this.recentHistory);
+          const openaiTopic = await this.getOpenAITopic(category, recentTitlesStr);
+          if (openaiTopic && this.isTopicDiverse(openaiTopic)) {
             return openaiTopic;
+          }
+          if (openaiTopic) {
+            log.info('OpenAI topic rejected by diversity filter');
           }
         } catch (error) {
           log.warn('OpenAI topic generation failed', error);
         }
         break;
 
-      case 'fallback':
+      case 'fallback': {
+        // Shuffle fallback topics and return first that passes diversity check
+        const shuffledFallbacks = [...FALLBACK_TOPICS];
+        for (let i = shuffledFallbacks.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffledFallbacks[i], shuffledFallbacks[j]] = [shuffledFallbacks[j], shuffledFallbacks[i]];
+        }
+        for (const fallback of shuffledFallbacks) {
+          if (this.isTopicDiverse(fallback)) {
+            log.info(`Using fallback topic: ${fallback.title}`);
+            return fallback;
+          }
+        }
+        // If all rejected, return a random one anyway (last resort)
         return this.getRandomFallbackTopic();
+      }
     }
 
     return null;
@@ -464,7 +533,7 @@ export class TrendsService {
   /**
    * Generate a trending topic using OpenAI
    */
-  async getOpenAITopic(category?: string): Promise<TrendingTopic | null> {
+  async getOpenAITopic(category?: string, recentArticleTitles?: string): Promise<TrendingTopic | null> {
     if (!this.openaiClient) {
       log.warn('OpenAI client not configured');
       return null;
@@ -472,9 +541,13 @@ export class TrendsService {
 
     log.info('Generating topic using OpenAI...');
 
-    const categoryContext = category && category !== 'all' 
-      ? `Focus on the ${category} category.` 
+    const categoryContext = category && category !== 'all'
+      ? `Focus on the ${category} category.`
       : 'Consider general interest topics.';
+
+    const recentContext = recentArticleTitles
+      ? `\n\nIMPORTANT: The following articles were recently published. Generate a topic on a DIFFERENT sub-topic to ensure variety:\n${recentArticleTitles}`
+      : '';
 
     try {
       const response = await this.openaiClient.chat.completions.create({
@@ -496,7 +569,7 @@ Respond in JSON format only:
           },
           {
             role: 'user',
-            content: `Generate a trending topic for an SEO article. ${categoryContext} Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`,
+            content: `Generate a trending topic for an SEO article. ${categoryContext} Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.${recentContext}`,
           },
         ],
         temperature: 0.8,

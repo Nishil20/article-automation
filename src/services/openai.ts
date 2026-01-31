@@ -187,11 +187,12 @@ export class OpenAIService {
   async generateUniqueAngle(
     topic: TrendingTopic,
     competitorAnalysis: CompetitorAnalysis,
-    keywords: ArticleKeywords
+    keywords: ArticleKeywords,
+    recentArticleContext?: string
   ): Promise<UniqueAngle> {
     log.info(`Generating unique angle for: ${topic.title}`);
 
-    const prompt = getUniqueAnglePrompt(topic.title, competitorAnalysis, keywords);
+    const prompt = getUniqueAnglePrompt(topic.title, competitorAnalysis, keywords, recentArticleContext);
     const response = await this.complete(SYSTEM_PROMPT, prompt, 0.7);
     const uniqueAngle = this.parseJSON<UniqueAngle>(response);
 

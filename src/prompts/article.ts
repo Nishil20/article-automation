@@ -220,13 +220,18 @@ Respond ONLY with valid JSON, no additional text.`;
 export function getUniqueAnglePrompt(
   topic: string,
   competitorAnalysis: CompetitorAnalysis,
-  keywords: ArticleKeywords
+  keywords: ArticleKeywords,
+  recentArticleContext?: string
 ): string {
+  const recentSection = recentArticleContext
+    ? `\nRECENTLY PUBLISHED ARTICLES (DO NOT repeat these angles or cover the same ground):\n${recentArticleContext}\n`
+    : '';
+
   return `You are a content strategist creating a unique angle for an article.
 
 TOPIC: "${topic}"
 PRIMARY KEYWORD: "${keywords.primary}"
-
+${recentSection}
 COMPETITOR ANALYSIS:
 - What competitors commonly cover: ${competitorAnalysis.commonTopics.join(', ')}
 - Content gaps found: ${competitorAnalysis.contentGaps.join(', ')}

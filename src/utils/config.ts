@@ -63,6 +63,14 @@ const DEFAULT_TOPIC_SOURCES: TopicSource[] = ['rss', 'google', 'openai', 'fallba
 // Valid topic source values
 const VALID_SOURCES = new Set(['rss', 'google', 'openai', 'fallback']);
 
+function parseCustomFeeds(envValue?: string): string[] {
+  if (!envValue) return [];
+  return envValue
+    .split(',')
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+}
+
 function parseTopicSources(envValue?: string): TopicSource[] {
   if (!envValue) {
     return DEFAULT_TOPIC_SOURCES;
@@ -118,6 +126,13 @@ export function loadConfig(): Config {
       geo: process.env.TRENDS_GEO || 'US',
       category: process.env.TRENDS_CATEGORY || 'all',
       sources: parseTopicSources(process.env.TOPIC_SOURCES),
+      customFeeds: parseCustomFeeds(process.env.CUSTOM_RSS_FEEDS),
+    },
+    diversity: {
+      similarityThreshold: parseFloat(process.env.DIVERSITY_SIMILARITY_THRESHOLD || '0.35'),
+      lookbackDays: parseInt(process.env.DIVERSITY_LOOKBACK_DAYS || '30', 10),
+      lookbackCount: parseInt(process.env.DIVERSITY_LOOKBACK_COUNT || '20', 10),
+      maxCandidates: parseInt(process.env.DIVERSITY_MAX_CANDIDATES || '10', 10),
     },
     unsplash: {
       accessKey: process.env.UNSPLASH_ACCESS_KEY || '',

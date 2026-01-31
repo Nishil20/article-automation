@@ -117,7 +117,8 @@ function buildLightweightConfig(): Config {
       appPassword: 'unused',
       category: 'Uncategorized',
     },
-    trends: { geo: 'US', category: 'all', sources: ['openai'] },
+    trends: { geo: 'US', category: 'all', sources: ['openai'], customFeeds: [] },
+    diversity: { similarityThreshold: 0.35, lookbackDays: 30, lookbackCount: 20, maxCandidates: 10 },
     unsplash: { accessKey: '', enabled: false },
     voice: {
       tone: 'conversational',

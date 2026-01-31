@@ -123,6 +123,13 @@ export const ConfigSchema = z.object({
     geo: z.string().default('US'),
     category: z.string().default('all'),
     sources: z.array(TopicSourceSchema).default(['rss', 'google', 'openai', 'fallback']),
+    customFeeds: z.array(z.string()).default([]),
+  }),
+  diversity: z.object({
+    similarityThreshold: z.number().min(0).max(1).default(0.35),
+    lookbackDays: z.number().int().positive().default(30),
+    lookbackCount: z.number().int().positive().default(20),
+    maxCandidates: z.number().int().positive().default(10),
   }),
   unsplash: z.object({
     accessKey: z.string().default(''),

@@ -11,6 +11,7 @@ import { ReadabilityService } from './services/readability.js';
 import { SchemaService } from './services/schema.js';
 import { PipelineResult, ExternalLink } from './types/index.js';
 import { renderFAQSection, generateTableOfContents, injectExternalLinks } from './utils/content.js';
+import { loadRecentHistory, getRecentArticleTitles, extractKeywords as extractDiversityKeywords } from './utils/topic-diversity.js';
 
 const log = logger.child('Pipeline');
 
@@ -36,6 +37,12 @@ async function runPipeline(): Promise<PipelineResult> {
     const unsplashService = new UnsplashService(config.unsplash);
     const readabilityService = new ReadabilityService(config);
     const schemaService = new SchemaService(config.wordpress);
+
+    // Load recent history for topic diversity
+    const recentHistory = await loadRecentHistory(config.diversity);
+    trendsService.setDiversityConfig(config.diversity);
+    trendsService.setRecentHistory(recentHistory);
+    const historyContext = getRecentArticleTitles(recentHistory);
 
     // Calculate total steps (base: 18, +1 if Unsplash enabled)
     const totalSteps = unsplashService.isEnabled() ? 19 : 18;
@@ -97,7 +104,7 @@ async function runPipeline(): Promise<PipelineResult> {
 
     // Step 5: Generate unique angle
     startStep(5, 'Generating unique angle');
-    const uniqueAngle = await openaiService.generateUniqueAngle(topic, competitorAnalysis, keywords);
+    const uniqueAngle = await openaiService.generateUniqueAngle(topic, competitorAnalysis, keywords, historyContext || undefined);
     log.info('Unique angle generated', {
       angle: uniqueAngle.angle.substring(0, 80),
       targetAudience: uniqueAngle.targetAudience,
@@ -424,12 +431,23 @@ async function saveToHistory(result: PipelineResult, startTime: Date): Promise<v
       // File doesn't exist yet
     }
 
+    // Build keyword list for diversity checking in future runs
+    const articleKeywords: string[] = [];
+    if (result.article?.keywords) {
+      articleKeywords.push(result.article.keywords.primary);
+      articleKeywords.push(...result.article.keywords.secondary);
+    }
+    if (result.article?.title) {
+      articleKeywords.push(...extractDiversityKeywords(result.article.title));
+    }
+
     const record = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       topic: result.topic?.title || 'Unknown',
       title: result.article?.title || '',
       slug: result.article?.slug || '',
       wordCount: result.article?.wordCount || 0,
+      keywords: [...new Set(articleKeywords)],
       status: result.success ? 'published' as const : 'failed' as const,
       postUrl: result.postUrl,
       error: result.error,
