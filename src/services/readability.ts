@@ -89,7 +89,7 @@ export class ReadabilityService {
   /**
    * Calculate Flesch Reading Ease score
    * Higher scores = easier to read
-   * 60-70 is the target range (easily understood by 13-15 year olds)
+   * 70-80 is the target range (Grade 7, easily understood by 12-13 year olds)
    */
   private calculateFleschReadingEase(
     totalWords: number,
@@ -138,12 +138,12 @@ export class ReadabilityService {
       );
     }
 
-    if (fleschReadingEase < 50) {
+    if (fleschReadingEase < 60) {
       suggestions.push('Break up complex paragraphs into shorter, focused sections');
       suggestions.push('Replace jargon and technical terms with simpler alternatives');
     }
 
-    if (fleschReadingEase < 40) {
+    if (fleschReadingEase < 50) {
       suggestions.push('Add more short sentences to create rhythm and improve flow');
       suggestions.push('Use bullet points or lists where appropriate');
     }
@@ -242,15 +242,15 @@ export class ReadabilityService {
     htmlContent: string,
     currentScore: ReadabilityScore
   ): Promise<string> {
-    // Skip if readability is already good
-    if (currentScore.fleschReadingEase >= 60) {
+    // Skip if readability is already good (Grade 7 target: FRE >= 70)
+    if (currentScore.fleschReadingEase >= 70) {
       log.info('Readability is good, skipping optimization');
       return htmlContent;
     }
 
     log.info('Optimizing content readability', {
       currentScore: currentScore.fleschReadingEase,
-      targetScore: 60,
+      targetScore: 70,
     });
 
     const systemPrompt = `You are an expert editor specializing in improving content readability.
@@ -259,7 +259,7 @@ Your goal is to make content easier to read while maintaining meaning and SEO va
     const userPrompt = `Improve the readability of this content.
 
 CURRENT READABILITY METRICS:
-- Flesch Reading Ease: ${currentScore.fleschReadingEase} (target: 60-70)
+- Flesch Reading Ease: ${currentScore.fleschReadingEase} (target: 70-80)
 - Average sentence length: ${currentScore.avgSentenceLength} words (target: 15-20)
 - Average syllables per word: ${currentScore.avgSyllablesPerWord} (target: ~1.5)
 
@@ -295,8 +295,8 @@ Output the improved HTML content only. Do NOT wrap in markdown code blocks.`;
     // Analyze initial readability
     const initialScore = this.analyzeReadability(htmlContent);
 
-    // Optimize if needed
-    if (initialScore.fleschReadingEase < 60) {
+    // Optimize if needed (Grade 7 target: FRE >= 70)
+    if (initialScore.fleschReadingEase < 70) {
       const optimizedContent = await this.optimizeReadability(htmlContent, initialScore);
       const finalScore = this.analyzeReadability(optimizedContent);
 

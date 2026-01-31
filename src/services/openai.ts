@@ -8,6 +8,7 @@ import {
   CompetitorAnalysis,
   UniqueAngle,
   KeywordPlan,
+  ExternalLink,
 } from '../types/index.js';
 import {
   SYSTEM_PROMPT,
@@ -23,6 +24,7 @@ import {
   getConclusionPrompt,
   getSectionExpansionPrompt,
   getFAQGenerationPrompt,
+  getExternalLinksPrompt,
 } from '../prompts/article.js';
 import { logger } from '../utils/logger.js';
 
@@ -502,6 +504,24 @@ export class OpenAIService {
 
     log.info(`Generated ${parsed.faqs.length} FAQ items`);
     return parsed.faqs;
+  }
+
+  /**
+   * Generate authoritative external links for E-E-A-T signals
+   */
+  async generateExternalLinks(
+    title: string,
+    content: string,
+    keywords: ArticleKeywords
+  ): Promise<ExternalLink[]> {
+    log.info('Generating external links for E-E-A-T');
+
+    const prompt = getExternalLinksPrompt(title, content, keywords);
+    const response = await this.complete(SYSTEM_PROMPT, prompt, 0.5);
+    const parsed = this.parseJSON<{ links: ExternalLink[] }>(response);
+
+    log.info(`Generated ${parsed.links.length} external links`);
+    return parsed.links;
   }
 
   /**

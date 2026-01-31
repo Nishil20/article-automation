@@ -68,22 +68,36 @@ export async function POST(request: NextRequest) {
           setStep('connecting', 'Testing WordPress connection...');
         } else if (text.includes('Discovering trending topic')) {
           setStep('trends', 'Discovering trending topic...');
+        } else if (text.includes('Analyzing competitors')) {
+          setStep('competitors', 'Analyzing competitors...');
         } else if (text.includes('Generating keywords')) {
           setStep('keywords', 'Generating keywords...');
+        } else if (text.includes('Generating unique angle')) {
+          setStep('angle', 'Generating unique angle...');
         } else if (text.includes('Generating outline')) {
           setStep('outline', 'Generating article outline...');
         } else if (text.includes('Generating article content')) {
           setStep('content', 'Writing article content...');
+        } else if (text.includes('Generating FAQ')) {
+          setStep('faq', 'Generating FAQ content...');
         } else if (text.includes('Humanizing article')) {
-          setStep('humanize', 'Humanizing content...');
+          setStep('humanize', 'Humanizing content (multi-pass)...');
+        } else if (text.includes('Enhancing originality')) {
+          setStep('originality', 'Enhancing originality...');
         } else if (text.includes('Optimizing readability')) {
-          setStep('readability', 'Optimizing readability...');
+          setStep('readability', 'Optimizing readability (Grade 7)...');
+        } else if (text.includes('Generating external links')) {
+          setStep('links', 'Generating external links...');
+        } else if (text.includes('Injecting FAQ') || text.includes('Injecting Table of Contents') || text.includes('Injecting external links')) {
+          setStep('structure', 'Adding FAQ, TOC & external links...');
         } else if (text.includes('Fetching featured image')) {
           setStep('image', 'Fetching featured image...');
         } else if (text.includes('Featured image uploaded')) {
           setStep('image', 'Featured image ready!');
         } else if (text.includes('Adding internal links')) {
-          setStep('publish', 'Adding links and schema...');
+          setStep('internal-links', 'Adding internal links...');
+        } else if (text.includes('Generating schema markup')) {
+          setStep('schema', 'Generating schema markup...');
         } else if (text.includes('Publishing to WordPress')) {
           setStep('publish', 'Publishing to WordPress...');
         } else if (text.includes('pipeline completed successfully') || text.includes('SUCCESS')) {

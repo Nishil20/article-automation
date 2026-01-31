@@ -1,6 +1,9 @@
 /**
- * Content utility functions for FAQ rendering and Table of Contents generation
+ * Content utility functions for FAQ rendering, Table of Contents generation,
+ * and external link injection
  */
+
+import { ExternalLink } from '../types/index.js';
 
 export interface FAQItem {
   question: string;
@@ -144,4 +147,81 @@ function escapeHtml(str: string): string {
  */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Inject external authoritative links into HTML content.
+ * Distributes links across <p> tags, max 1 external link per ~300 words.
+ */
+export function injectExternalLinks(
+  htmlContent: string,
+  links: ExternalLink[]
+): string {
+  if (links.length === 0) return htmlContent;
+
+  // Count total words to determine max links
+  const plainText = htmlContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const totalWords = plainText.split(/\s+/).length;
+  const maxLinks = Math.max(1, Math.floor(totalWords / 300));
+  const linksToInsert = links.slice(0, Math.min(links.length, maxLinks));
+
+  // Collect all <p>...</p> segments with their positions
+  const pTagRegex = /<p>([\s\S]*?)<\/p>/gi;
+  const paragraphs: Array<{ start: number; end: number; content: string }> = [];
+  let pMatch;
+  while ((pMatch = pTagRegex.exec(htmlContent)) !== null) {
+    paragraphs.push({
+      start: pMatch.index,
+      end: pMatch.index + pMatch[0].length,
+      content: pMatch[0],
+    });
+  }
+
+  if (paragraphs.length === 0) return htmlContent;
+
+  // Evenly distribute links across paragraphs (skip first and last)
+  const usableParagraphs = paragraphs.slice(1, -1).length > 0
+    ? paragraphs.slice(1, -1)
+    : paragraphs;
+
+  const step = Math.max(1, Math.floor(usableParagraphs.length / linksToInsert.length));
+  const replacements: Array<{ original: string; replacement: string }> = [];
+
+  for (let i = 0; i < linksToInsert.length; i++) {
+    const pIdx = Math.min(i * step, usableParagraphs.length - 1);
+    const para = usableParagraphs[pIdx];
+    const link = linksToInsert[i];
+
+    // Skip paragraphs that already contain external links
+    if (para.content.includes('target="_blank"')) continue;
+
+    // Try to find the anchor text in the paragraph for inline placement
+    const anchorEscaped = escapeRegex(link.anchorText);
+    const anchorRegex = new RegExp(`(${anchorEscaped})`, 'i');
+
+    if (anchorRegex.test(para.content)) {
+      // Replace first occurrence of anchor text with a link
+      const updated = para.content.replace(
+        anchorRegex,
+        `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">$1</a>`
+      );
+      replacements.push({ original: para.content, replacement: updated });
+    } else {
+      // Append a contextual sentence with the link before the closing </p>
+      const linkHtml = `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.anchorText)}</a>`;
+      const updated = para.content.replace(
+        /<\/p>$/i,
+        ` According to ${linkHtml}, this is supported by current research.</p>`
+      );
+      replacements.push({ original: para.content, replacement: updated });
+    }
+  }
+
+  // Apply replacements (each original should be unique since paragraphs differ)
+  let result = htmlContent;
+  for (const { original, replacement } of replacements) {
+    result = result.replace(original, replacement);
+  }
+
+  return result;
 }

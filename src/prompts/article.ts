@@ -58,9 +58,11 @@ LSI Keywords: ${keywords.lsiKeywords.join(', ')}
 Requirements:
 - Create an engaging title that includes the primary keyword naturally
 - Write a compelling introduction hook (2-3 sentences)
-- Include 4-6 main sections (H2 headings) that cover the topic comprehensively
+- Include 5-7 main sections (H2 headings) that cover the topic comprehensively
 - Each section should have 1-3 subheadings (H3) where appropriate
+- Use H4/H5 subheadings within complex subsections for deeper structure when warranted
 - List 2-4 key points to cover in each section
+- Include E-E-A-T signals: sections that demonstrate first-hand experience, cite expert knowledge, and provide authoritative data
 - Write a conclusion summary
 
 Generate a JSON response:
@@ -116,11 +118,18 @@ VOICE & TONE:
 - Perspective: ${voiceConfig.perspective} - ${perspectiveGuide[voiceConfig.perspective]}
 - Personality: ${voiceConfig.personality}
 
+E-E-A-T REQUIREMENTS:
+- Experience: Include first-hand experience markers ("In practice...", "From hands-on testing...", "Based on real-world use...")
+- Expertise: Reference specific data points, research findings, or industry-standard methodologies
+- Authoritativeness: Cite recognized authorities, standards bodies, or established best practices
+- Trustworthiness: Present balanced viewpoints, acknowledge limitations, and use precise language
+
 WRITING REQUIREMENTS:
 1. Write 1500-2000 words of high-quality content
 2. Format using semantic HTML tags:
    - <h2> for main section headings
    - <h3> for subheadings
+   - <h4>, <h5>, <h6> for deeper sub-structure where it aids clarity
    - <p> for paragraphs
    - <ul>/<li> for bullet lists
    - <strong> for emphasis on important terms
@@ -269,9 +278,11 @@ Requirements:
 - Create an engaging title that includes the primary keyword AND hints at the unique angle
 - Write a compelling introduction that immediately establishes the unique perspective
 - Structure sections to deliver on the unique angle's promise
-- Include 4-6 main sections (H2 headings) that cover the topic through this unique lens
+- Include 5-7 main sections (H2 headings) that cover the topic through this unique lens
 - Each section should have 1-3 subheadings (H3) where appropriate
+- Use H4/H5 subheadings within complex subsections for deeper structure when warranted
 - List 2-4 key points per section that reinforce the unique angle
+- Include E-E-A-T signals: sections demonstrating experience, expertise, and authoritative data
 - Conclusion should tie back to the unique value provided
 
 Generate a JSON response:
@@ -452,10 +463,16 @@ VOICE & TONE:
 - Perspective: ${voiceConfig.perspective} - ${perspectiveGuide[voiceConfig.perspective]}
 - Personality: ${voiceConfig.personality}
 
+E-E-A-T SIGNALS TO INCLUDE:
+- First-hand experience markers where natural ("In practice...", "From experience...", "When tested...")
+- Specific data points, percentages, or research findings to demonstrate expertise
+- Reference authoritative sources or industry standards where relevant
+
 REQUIREMENTS:
 - Write 250-400 words for this section (MINIMUM 250 words — this is critical)
 - Start with <h2>${section.heading}</h2>
 - Use <h3> for any subheadings
+- Use <h4> or <h5> for deeper sub-structure within complex subsections if warranted
 - Use <p> for paragraphs, <ul>/<li> for lists, <strong> for emphasis
 - Include specific data, examples, or actionable advice
 - Use transition words to connect ideas
@@ -555,12 +572,13 @@ SECONDARY KEYWORDS: ${keywords.secondary.join(', ')}
 ARTICLE CONTENT PREVIEW:
 ${articleContent.substring(0, 2000)}...
 
-Generate 5-7 commonly asked questions that:
+Generate 6-8 commonly asked questions that:
 1. Are genuinely useful questions people search for related to this topic
-2. Include the primary keyword naturally in at least 2 questions
+2. Include the primary keyword naturally in at least 2-3 questions
 3. Cover different aspects of the topic (what, how, why, when, comparison, cost, etc.)
-4. Have concise, informative answers (2-4 sentences each)
+4. Have concise, informative answers (2-4 sentences each) that cite authoritative reasoning and demonstrate expertise
 5. Would trigger Google's "People Also Ask" featured snippet
+6. Demonstrate E-E-A-T: answers should reference credible sources, industry standards, or expert consensus where applicable
 
 Generate a JSON response:
 {
@@ -635,6 +653,54 @@ Generate a JSON response:
     }
   ],
   "conclusion": "Summary"
+}
+
+Respond ONLY with valid JSON, no additional text.`;
+}
+
+/**
+ * Generate external authoritative links for an article
+ */
+export function getExternalLinksPrompt(
+  title: string,
+  content: string,
+  keywords: ArticleKeywords
+): string {
+  return `You are an SEO expert adding authoritative external links to enhance E-E-A-T signals.
+
+ARTICLE TITLE: "${title}"
+PRIMARY KEYWORD: "${keywords.primary}"
+SECONDARY KEYWORDS: ${keywords.secondary.join(', ')}
+
+ARTICLE CONTENT PREVIEW:
+${content.substring(0, 3000)}...
+
+Generate 3-5 authoritative external links that would strengthen this article's credibility and E-E-A-T signals.
+
+LINK SOURCE PRIORITIES (in order):
+1. Government sites (.gov)
+2. Educational institutions (.edu)
+3. Major publications (NYT, BBC, Reuters, Forbes, etc.)
+4. Industry-leading organizations and standards bodies
+5. Peer-reviewed research or established databases
+
+REQUIREMENTS:
+- Each link must be a REAL, well-known, authoritative URL that is highly likely to exist
+- Use general domain URLs (e.g., "https://www.cdc.gov", "https://www.who.int") rather than specific deep-linked pages that may not exist
+- The anchor text should read naturally in context
+- Provide a context sentence showing how the link fits into the article
+- Links should support different claims or sections throughout the article
+- Do NOT link to competitors, affiliate sites, or low-authority domains
+
+Generate a JSON response:
+{
+  "links": [
+    {
+      "url": "https://www.example.gov",
+      "anchorText": "natural anchor text for the link",
+      "contextSentence": "A sentence where this link would naturally appear in the article."
+    }
+  ]
 }
 
 Respond ONLY with valid JSON, no additional text.`;

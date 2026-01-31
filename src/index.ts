@@ -7,12 +7,15 @@ import { WordPressService } from './services/wordpress.js';
 import { UnsplashService } from './services/unsplash.js';
 import { ReadabilityService } from './services/readability.js';
 import { SchemaService } from './services/schema.js';
-import { PipelineResult } from './types/index.js';
+import { PipelineResult, ExternalLink } from './types/index.js';
+import { renderFAQSection, generateTableOfContents, injectExternalLinks } from './utils/content.js';
 
 const log = logger.child('Pipeline');
 
 /**
- * Simplified article automation pipeline (10 steps, 4-5 API calls)
+ * Full SEO-optimized article automation pipeline (~19 steps)
+ * Includes E-E-A-T signals, competitor analysis, multi-pass humanization,
+ * FAQs, Table of Contents, external links, and Grade 7 readability.
  */
 async function runPipeline(): Promise<PipelineResult> {
   const startTime = Date.now();
@@ -32,8 +35,8 @@ async function runPipeline(): Promise<PipelineResult> {
     const readabilityService = new ReadabilityService(config);
     const schemaService = new SchemaService(config.wordpress);
 
-    // Calculate total steps (base: 10, +1 if Unsplash enabled)
-    const totalSteps = unsplashService.isEnabled() ? 11 : 10;
+    // Calculate total steps (base: 18, +1 if Unsplash enabled)
+    const totalSteps = unsplashService.isEnabled() ? 19 : 18;
     let currentStep = 0;
 
     // Step timing helper
@@ -72,8 +75,17 @@ async function runPipeline(): Promise<PipelineResult> {
     });
     endStep('Topic discovery');
 
-    // Step 3: Generate keywords
-    startStep(3, 'Generating keywords');
+    // Step 3: Analyze competitors
+    startStep(3, 'Analyzing competitors');
+    const competitorAnalysis = await openaiService.analyzeCompetitors(topic);
+    log.info('Competitor analysis complete', {
+      contentGaps: competitorAnalysis.contentGaps.length,
+      averageDepth: competitorAnalysis.averageDepth,
+    });
+    endStep('Competitor analysis');
+
+    // Step 4: Generate keywords
+    startStep(4, 'Generating keywords');
     const keywords = await openaiService.generateKeywords(topic);
     log.info('Keywords generated', {
       primary: keywords.primary,
@@ -81,18 +93,27 @@ async function runPipeline(): Promise<PipelineResult> {
     });
     endStep('Keyword generation');
 
-    // Step 4: Generate outline
-    startStep(4, 'Generating outline');
-    const outline = await openaiService.generateOutline(topic, keywords);
+    // Step 5: Generate unique angle
+    startStep(5, 'Generating unique angle');
+    const uniqueAngle = await openaiService.generateUniqueAngle(topic, competitorAnalysis, keywords);
+    log.info('Unique angle generated', {
+      angle: uniqueAngle.angle.substring(0, 80),
+      targetAudience: uniqueAngle.targetAudience,
+    });
+    endStep('Unique angle');
+
+    // Step 6: Generate outline (with angle)
+    startStep(6, 'Generating outline with unique angle');
+    const outline = await openaiService.generateOutlineWithAngle(topic, keywords, uniqueAngle);
     log.info('Outline generated', {
       title: outline.title,
       sectionCount: outline.sections.length,
     });
     endStep('Outline generation');
 
-    // Step 5: Generate article content
-    startStep(5, 'Generating article content');
-    const content = await openaiService.generateContent(outline, keywords);
+    // Step 7: Generate article content (section-by-section)
+    startStep(7, 'Generating article content section-by-section');
+    const content = await openaiService.generateContentBySection(outline, keywords);
     const meta = await openaiService.generateMeta(outline.title, content, keywords);
     const rawWordCount = content.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(w => w.length > 0).length;
     log.info(`Article generated: ${rawWordCount} words`);
@@ -109,15 +130,33 @@ async function runPipeline(): Promise<PipelineResult> {
       wordCount: rawWordCount,
     };
 
-    // Step 6: Humanize content (single pass)
-    startStep(6, 'Humanizing article content');
-    const humanizedArticle = await humanizerService.humanizeSinglePass(rawArticle);
+    // Step 8: Generate FAQs
+    startStep(8, 'Generating FAQ content');
+    const faqs = await openaiService.generateFAQs(outline.title, content, keywords);
+    log.info(`Generated ${faqs.length} FAQ items`);
+    endStep('FAQ generation');
+
+    // Step 9: Humanize content (full multi-pass)
+    startStep(9, 'Humanizing article content (multi-pass)');
+    const humanizedArticle = await humanizerService.humanizeArticle(rawArticle);
     log.info(`Humanized article: ${humanizedArticle.wordCount} words`);
     endStep('Humanization');
 
-    // Step 7: Optimize readability
-    startStep(7, 'Optimizing readability');
-    const { content: readableContent, initialScore, finalScore } = await readabilityService.enhanceReadability(humanizedArticle.content);
+    // Step 10: Enhance originality
+    startStep(10, 'Enhancing originality');
+    const { content: originalContent, originalityCheck, improved: originalityImproved } =
+      await humanizerService.enhanceOriginality(humanizedArticle.content);
+    humanizedArticle.content = originalContent;
+    log.info('Originality enhancement complete', {
+      score: originalityCheck.overallScore,
+      improved: originalityImproved,
+    });
+    endStep('Originality enhancement');
+
+    // Step 11: Optimize readability (Grade 7 target, FRE >= 70)
+    startStep(11, 'Optimizing readability (Grade 7 target)');
+    const { content: readableContent, initialScore, finalScore } =
+      await readabilityService.enhanceReadability(humanizedArticle.content);
     humanizedArticle.content = readableContent;
     log.info('Readability optimization complete', {
       initialScore: initialScore.fleschReadingEase,
@@ -126,12 +165,65 @@ async function runPipeline(): Promise<PipelineResult> {
     });
     endStep('Readability optimization');
 
+    // Step 12: Generate external links
+    startStep(12, 'Generating external links');
+    let externalLinks: ExternalLink[];
+    try {
+      externalLinks = await openaiService.generateExternalLinks(
+        humanizedArticle.title,
+        humanizedArticle.content,
+        humanizedArticle.keywords
+      );
+      log.info(`Generated ${externalLinks.length} external links`);
+    } catch (extLinkError) {
+      log.warn('Failed to generate external links, continuing without', extLinkError);
+      externalLinks = [];
+    }
+    endStep('External link generation');
+
+    // Step 13: Inject FAQ section into content
+    startStep(13, 'Injecting FAQ section');
+    const faqHtml = renderFAQSection(faqs);
+    if (faqHtml) {
+      humanizedArticle.content = humanizedArticle.content + '\n\n' + faqHtml;
+      log.info('FAQ section injected');
+    }
+    endStep('FAQ injection');
+
+    // Step 14: Inject Table of Contents
+    startStep(14, 'Injecting Table of Contents');
+    const { tocHtml, contentWithIds } = generateTableOfContents(humanizedArticle.content);
+    if (tocHtml) {
+      // Insert TOC after the first paragraph
+      const firstPEnd = contentWithIds.indexOf('</p>');
+      if (firstPEnd !== -1) {
+        humanizedArticle.content =
+          contentWithIds.slice(0, firstPEnd + 4) +
+          '\n\n' + tocHtml + '\n\n' +
+          contentWithIds.slice(firstPEnd + 4);
+      } else {
+        humanizedArticle.content = tocHtml + '\n\n' + contentWithIds;
+      }
+      log.info('Table of Contents injected');
+    } else {
+      humanizedArticle.content = contentWithIds;
+    }
+    endStep('TOC injection');
+
+    // Step 15: Inject external links
+    startStep(15, 'Injecting external links');
+    if (externalLinks.length > 0) {
+      humanizedArticle.content = injectExternalLinks(humanizedArticle.content, externalLinks);
+      log.info(`Injected ${externalLinks.length} external links`);
+    }
+    endStep('External link injection');
+
     // Ensure unique slug
     humanizedArticle.slug = await wordpressService.ensureUniqueSlug(
       humanizedArticle.slug
     );
 
-    // Step 8: Fetch featured image (if Unsplash is enabled)
+    // Step 16: Fetch featured image (if Unsplash is enabled)
     let featuredMediaId: number | undefined;
     if (unsplashService.isEnabled()) {
       startStep(currentStep + 1, 'Fetching featured image');
@@ -174,8 +266,8 @@ async function runPipeline(): Promise<PipelineResult> {
       endStep('Featured image');
     }
 
-    // Step 9: Internal links + Schema markup
-    startStep(currentStep + 1, 'Adding internal links and schema');
+    // Step 17: Add internal links
+    startStep(currentStep + 1, 'Adding internal links');
     try {
       const linkKeywords = [
         humanizedArticle.keywords.primary,
@@ -198,8 +290,10 @@ async function runPipeline(): Promise<PipelineResult> {
     } catch (linkError) {
       log.warn('Failed to add internal links, continuing without', linkError);
     }
+    endStep('Internal links');
 
-    // Schema markup
+    // Step 18: Generate schema (Article + FAQ + Breadcrumb)
+    startStep(currentStep + 1, 'Generating schema markup');
     const postUrl = `${config.wordpress.url}/${humanizedArticle.slug}`;
     const articleSchema = schemaService.generateArticleSchema(humanizedArticle, {
       postUrl,
@@ -209,6 +303,14 @@ async function runPipeline(): Promise<PipelineResult> {
 
     const schemas: object[] = [articleSchema];
 
+    // FAQ schema
+    if (faqs.length > 0) {
+      const faqSchema = schemaService.generateFAQSchema(faqs);
+      schemas.push(faqSchema);
+      log.info('FAQ schema generated');
+    }
+
+    // Breadcrumb schema
     const breadcrumbSchema = schemaService.generateBreadcrumbSchema([
       { name: 'Home', url: config.wordpress.url },
       { name: config.wordpress.category, url: `${config.wordpress.url}/category/${config.wordpress.category.toLowerCase().replace(/\s+/g, '-')}` },
@@ -219,10 +321,11 @@ async function runPipeline(): Promise<PipelineResult> {
     humanizedArticle.content = schemaService.injectMultipleSchemas(humanizedArticle.content, schemas);
     log.info('Schema markup generated and injected', {
       schemaCount: schemas.length,
+      types: ['Article', ...(faqs.length > 0 ? ['FAQPage'] : []), 'BreadcrumbList'],
     });
-    endStep('Internal links + schema');
+    endStep('Schema markup');
 
-    // Step 10: Publish to WordPress
+    // Step 19: Publish to WordPress
     startStep(currentStep + 1, 'Publishing to WordPress');
     const post = await wordpressService.publishArticle(humanizedArticle, {
       featuredMediaId,
@@ -245,6 +348,9 @@ async function runPipeline(): Promise<PipelineResult> {
       totalTokens: tokenUsage.totalTokens,
       hasFeaturedImage: !!humanizedArticle.featuredImage,
       readabilityScore: finalScore.fleschReadingEase,
+      faqCount: faqs.length,
+      externalLinks: externalLinks.length,
+      originalityScore: originalityCheck.overallScore,
     });
 
     return {

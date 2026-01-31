@@ -216,6 +216,13 @@ export interface ArticleSchemaMarkup {
   articleSection?: string;
 }
 
+// External link for authoritative source citations
+export interface ExternalLink {
+  url: string;
+  anchorText: string;
+  contextSentence: string;
+}
+
 // Originality check results
 export interface OriginalityCheck {
   overallScore: number;         // 0-100 (higher = more original)
