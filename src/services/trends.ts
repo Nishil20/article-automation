@@ -225,7 +225,7 @@ export class TrendsService {
         const feed = await rssParser.parseURL(feedUrl);
         return feed.items || [];
       } catch (error) {
-        log.debug(`Failed to fetch RSS feed: ${feedUrl}`, error);
+        log.warn(`Failed to fetch RSS feed: ${feedUrl}`, error);
         return [];
       }
     });
@@ -400,9 +400,8 @@ export class TrendsService {
         try {
           const rssTopics = await this.getRSSTopics(category);
           if (rssTopics.length > 0) {
-            // Shuffle candidates for variety
-            const maxCandidates = this.diversityConfig?.maxCandidates ?? 10;
-            const candidates = rssTopics.slice(0, maxCandidates);
+            // Shuffle all candidates for variety
+            const candidates = [...rssTopics];
             for (let i = candidates.length - 1; i > 0; i--) {
               const j = Math.floor(Math.random() * (i + 1));
               [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
@@ -414,7 +413,7 @@ export class TrendsService {
                 return candidate;
               }
             }
-            log.info('All RSS candidates rejected by diversity filter');
+            log.info(`All ${candidates.length} RSS candidates rejected by diversity filter`);
           }
         } catch (error) {
           log.warn('RSS feeds unavailable', error);
