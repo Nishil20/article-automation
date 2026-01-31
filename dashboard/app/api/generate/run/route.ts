@@ -22,10 +22,16 @@ export async function POST(request: NextRequest) {
     const settings = await getSettings();
 
     // Set environment variables for the child process
+    // Forward all dashboard settings so the subprocess matches what the UI shows
     const env = {
       ...process.env,
       ARTICLE_TOPIC: topic || '',
-      VOICE_TONE: voiceTone || process.env.VOICE_TONE || 'conversational',
+      OPENAI_MODEL: settings.openaiModel || process.env.OPENAI_MODEL || 'gpt-4o',
+      WP_CATEGORY: settings.wpCategory || process.env.WP_CATEGORY || 'Uncategorized',
+      TRENDS_GEO: settings.trendsGeo || process.env.TRENDS_GEO || 'US',
+      VOICE_TONE: voiceTone || settings.voiceTone || process.env.VOICE_TONE || 'conversational',
+      VOICE_PERSPECTIVE: settings.voicePerspective || process.env.VOICE_PERSPECTIVE || 'second_person',
+      VOICE_PERSONALITY: settings.voicePersonality || process.env.VOICE_PERSONALITY || '',
       UNSPLASH_ENABLED: settings.unsplashEnabled ? 'true' : 'false',
     };
 
