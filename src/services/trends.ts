@@ -114,6 +114,7 @@ export class TrendsService {
     if (openaiConfig?.apiKey) {
       this.openaiClient = new OpenAI({
         apiKey: openaiConfig.apiKey,
+        maxRetries: 5,
       });
       this.openaiModel = openaiConfig.model || 'gpt-4o';
     }

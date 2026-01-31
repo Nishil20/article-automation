@@ -145,9 +145,9 @@ async function runPipeline(): Promise<PipelineResult> {
     log.info(`Generated ${faqs.length} FAQ items`);
     endStep('FAQ generation');
 
-    // Step 9: Humanize content (full multi-pass)
-    startStep(9, 'Humanizing article content (multi-pass)');
-    const humanizedArticle = await humanizerService.humanizeArticle(rawArticle);
+    // Step 9: Humanize content (single-pass for reliability)
+    startStep(9, 'Humanizing article content');
+    const humanizedArticle = await humanizerService.humanizeSinglePass(rawArticle);
     log.info(`Humanized article: ${humanizedArticle.wordCount} words`);
     endStep('Humanization');
 

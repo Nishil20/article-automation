@@ -45,7 +45,7 @@ export class KeywordResearchService {
   };
 
   constructor(config: Config, providers?: KeywordDataProvider[]) {
-    this.client = new OpenAI({ apiKey: config.openai.apiKey });
+    this.client = new OpenAI({ apiKey: config.openai.apiKey, maxRetries: 5 });
     this.model = config.openai.model;
     this.providers = providers || [new GoogleAutocompleteProvider()];
   }

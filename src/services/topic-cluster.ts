@@ -23,7 +23,7 @@ export class TopicClusterService {
 
   constructor(openaiConfig?: { apiKey: string }) {
     if (openaiConfig) {
-      this.openaiClient = new OpenAI({ apiKey: openaiConfig.apiKey });
+      this.openaiClient = new OpenAI({ apiKey: openaiConfig.apiKey, maxRetries: 5 });
     }
     this.loadClusters();
   }

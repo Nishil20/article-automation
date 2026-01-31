@@ -49,6 +49,7 @@ export class OpenAIService {
   constructor(config: Config) {
     this.client = new OpenAI({
       apiKey: config.openai.apiKey,
+      maxRetries: 5,
     });
     this.model = config.openai.model;
     this.config = config;
