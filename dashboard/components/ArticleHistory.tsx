@@ -1,6 +1,6 @@
 'use client';
 
-import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { cn, formatDate, formatDuration, formatNumber } from '@/lib/utils';
 import { ExternalLink, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 interface ArticleRecord {
@@ -13,6 +13,7 @@ interface ArticleRecord {
   postUrl?: string;
   error?: string;
   createdAt: string;
+  completedAt?: string;
 }
 
 interface ArticleHistoryProps {
@@ -69,6 +70,9 @@ export function ArticleHistory({ articles }: ArticleHistoryProps) {
                 {formatDate(article.createdAt)}
                 {article.wordCount > 0 && (
                   <span className="ml-2">• {formatNumber(article.wordCount)} words</span>
+                )}
+                {article.completedAt && (
+                  <span className="ml-2">• {formatDuration(article.createdAt, article.completedAt)}</span>
                 )}
               </p>
               {article.error && (

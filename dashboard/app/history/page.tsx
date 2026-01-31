@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { cn, formatDate, formatDuration, formatNumber } from '@/lib/utils';
 import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
 
 interface ArticleRecord {
@@ -108,6 +108,9 @@ export default function HistoryPage() {
                   <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">
                     Created
                   </th>
+                  <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">
+                    Duration
+                  </th>
                   <th className="text-right px-6 py-4 text-sm font-medium text-muted-foreground">
                     Actions
                   </th>
@@ -159,6 +162,13 @@ export default function HistoryPage() {
                     <td className="px-6 py-4">
                       <span className="text-sm text-muted-foreground">
                         {formatDate(article.createdAt)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-muted-foreground">
+                        {article.completedAt
+                          ? formatDuration(article.createdAt, article.completedAt)
+                          : '-'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">

@@ -1,3 +1,5 @@
+import { promises as fs } from 'fs';
+import path from 'path';
 import { loadConfig } from './utils/config.js';
 import { logger } from './utils/logger.js';
 import { TrendsService } from './services/trends.js';
@@ -406,6 +408,48 @@ async function runWithRetry(maxRetries: number = 3): Promise<PipelineResult> {
 }
 
 /**
+ * Save pipeline result to history.json so the dashboard can display it
+ */
+async function saveToHistory(result: PipelineResult, startTime: Date): Promise<void> {
+  try {
+    const historyPath = path.join(process.cwd(), 'data', 'history.json');
+
+    await fs.mkdir(path.dirname(historyPath), { recursive: true });
+
+    let history: Record<string, unknown>[] = [];
+    try {
+      const data = await fs.readFile(historyPath, 'utf-8');
+      history = JSON.parse(data);
+    } catch {
+      // File doesn't exist yet
+    }
+
+    const record = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      topic: result.topic?.title || 'Unknown',
+      title: result.article?.title || '',
+      slug: result.article?.slug || '',
+      wordCount: result.article?.wordCount || 0,
+      status: result.success ? 'published' as const : 'failed' as const,
+      postUrl: result.postUrl,
+      error: result.error,
+      createdAt: startTime.toISOString(),
+      completedAt: new Date().toISOString(),
+    };
+
+    history.unshift(record);
+    if (history.length > 100) {
+      history.splice(100);
+    }
+
+    await fs.writeFile(historyPath, JSON.stringify(history, null, 2), 'utf-8');
+    log.info('Article saved to history');
+  } catch (err) {
+    log.warn('Failed to save to history', err);
+  }
+}
+
+/**
  * Main entry point
  */
 async function main(): Promise<void> {
@@ -413,7 +457,10 @@ async function main(): Promise<void> {
   log.info('Article Automation System');
   log.info('='.repeat(60));
 
+  const startTime = new Date();
   const result = await runWithRetry();
+
+  await saveToHistory(result, startTime);
 
   if (result.success) {
     log.info('='.repeat(60));

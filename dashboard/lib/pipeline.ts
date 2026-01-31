@@ -5,12 +5,20 @@ export type PipelineStep =
   | 'idle'
   | 'connecting'
   | 'trends'
+  | 'competitors'
   | 'keywords'
+  | 'angle'
   | 'outline'
   | 'content'
+  | 'faq'
   | 'humanize'
+  | 'originality'
   | 'readability'
+  | 'links'
+  | 'structure'
   | 'image'
+  | 'internal-links'
+  | 'schema'
   | 'publish'
   | 'complete'
   | 'failed';
@@ -59,14 +67,22 @@ const STALE_TIMEOUT_MS = 18 * 60 * 1000; // 18 minutes - consider stale if runni
 const STEP_PROGRESS: Record<PipelineStep, number> = {
   idle: 0,
   connecting: 5,
-  trends: 12,
-  keywords: 22,
-  outline: 34,
-  content: 48,
-  humanize: 62,
-  readability: 72,
+  trends: 10,
+  competitors: 15,
+  keywords: 20,
+  angle: 25,
+  outline: 30,
+  content: 38,
+  faq: 45,
+  humanize: 52,
+  originality: 58,
+  readability: 64,
+  links: 70,
+  structure: 75,
   image: 80,
-  publish: 90,
+  'internal-links': 85,
+  schema: 88,
+  publish: 92,
   complete: 100,
   failed: 0,
 };

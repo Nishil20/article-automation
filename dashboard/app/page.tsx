@@ -51,37 +51,51 @@ export default function Dashboard() {
       .catch(console.error);
   }, []);
 
-  // Subscribe to status updates via SSE
+  // Subscribe to status updates via SSE with auto-reconnect
   useEffect(() => {
-    const eventSource = new EventSource('/api/status');
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: NodeJS.Timeout;
+    let cancelled = false;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        setStatus(data);
+    function connect() {
+      if (cancelled) return;
+      eventSource = new EventSource('/api/status');
 
-        // Refresh history when complete or failed
-        if (data.step === 'complete' || data.step === 'failed') {
-          fetch('/api/history')
-            .then((res) => res.json())
-            .then((historyData) => {
-              if (Array.isArray(historyData)) {
-                setArticles(historyData);
-              }
-            })
-            .catch(console.error);
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          setStatus(data);
+
+          // Refresh history when complete or failed
+          if (data.step === 'complete' || data.step === 'failed') {
+            fetch('/api/history')
+              .then((res) => res.json())
+              .then((historyData) => {
+                if (Array.isArray(historyData)) {
+                  setArticles(historyData);
+                }
+              })
+              .catch(console.error);
+          }
+        } catch (e) {
+          console.error('Failed to parse status:', e);
         }
-      } catch (e) {
-        console.error('Failed to parse status:', e);
-      }
-    };
+      };
 
-    eventSource.onerror = () => {
-      console.error('SSE connection error');
-    };
+      eventSource.onerror = () => {
+        eventSource?.close();
+        if (!cancelled) {
+          reconnectTimeout = setTimeout(connect, 2000);
+        }
+      };
+    }
+
+    connect();
 
     return () => {
-      eventSource.close();
+      cancelled = true;
+      clearTimeout(reconnectTimeout);
+      eventSource?.close();
     };
   }, []);
 

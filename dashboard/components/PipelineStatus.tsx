@@ -24,12 +24,20 @@ type PipelineStep =
   | 'idle'
   | 'connecting'
   | 'trends'
+  | 'competitors'
   | 'keywords'
+  | 'angle'
   | 'outline'
   | 'content'
+  | 'faq'
   | 'humanize'
+  | 'originality'
   | 'readability'
+  | 'links'
+  | 'structure'
   | 'image'
+  | 'internal-links'
+  | 'schema'
   | 'publish'
   | 'complete'
   | 'failed';
@@ -48,25 +56,25 @@ const PHASES = [
     id: 'setup',
     label: 'Setup',
     icon: Zap,
-    steps: ['connecting', 'trends'],
+    steps: ['connecting', 'trends', 'competitors'],
   },
   {
     id: 'writing',
     label: 'Writing',
     icon: Sparkles,
-    steps: ['keywords', 'outline', 'content'],
+    steps: ['keywords', 'angle', 'outline', 'content', 'faq'],
   },
   {
     id: 'optimize',
     label: 'Optimize',
     icon: Wand2,
-    steps: ['humanize', 'readability'],
+    steps: ['humanize', 'originality', 'readability', 'links', 'structure'],
   },
   {
     id: 'publish',
     label: 'Publish',
     icon: Send,
-    steps: ['image', 'publish'],
+    steps: ['image', 'internal-links', 'schema', 'publish'],
   },
 ] as const;
 
@@ -74,12 +82,20 @@ const PHASES = [
 const STEP_DETAILS: Record<string, { label: string; description: string; icon: typeof Zap }> = {
   connecting: { label: 'Connecting', description: 'WordPress connection', icon: Zap },
   trends: { label: 'Finding Topics', description: 'Analyzing trends', icon: Search },
+  competitors: { label: 'Competitors', description: 'Analyzing top results', icon: Search },
   keywords: { label: 'Keywords', description: 'SEO optimization', icon: Key },
+  angle: { label: 'Unique Angle', description: 'Differentiation strategy', icon: Sparkles },
   outline: { label: 'Outlining', description: 'Article structure', icon: FileText },
   content: { label: 'Writing', description: 'Generating content', icon: Sparkles },
+  faq: { label: 'FAQ', description: 'Generating questions', icon: FileText },
   humanize: { label: 'Humanizing', description: 'Natural language', icon: Wand2 },
-  readability: { label: 'Optimizing', description: 'Readability check', icon: BookOpen },
+  originality: { label: 'Originality', description: 'Enhancing uniqueness', icon: Wand2 },
+  readability: { label: 'Readability', description: 'Grade 7 optimization', icon: BookOpen },
+  links: { label: 'External Links', description: 'Authoritative sources', icon: ExternalLink },
+  structure: { label: 'Structure', description: 'FAQ, TOC & links', icon: FileText },
   image: { label: 'Image', description: 'Featured image', icon: Image },
+  'internal-links': { label: 'Internal Links', description: 'Related articles', icon: ExternalLink },
+  schema: { label: 'Schema', description: 'JSON-LD markup', icon: FileText },
   publish: { label: 'Publishing', description: 'WordPress upload', icon: Send },
 };
 

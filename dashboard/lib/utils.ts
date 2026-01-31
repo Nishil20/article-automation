@@ -18,3 +18,15 @@ export function formatDate(date: string | Date): string {
 export function formatNumber(num: number): string {
   return new Intl.NumberFormat('en-US').format(num);
 }
+
+export function formatDuration(startDate: string, endDate: string): string {
+  const ms = new Date(endDate).getTime() - new Date(startDate).getTime();
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  if (minutes === 0) {
+    return `${seconds}s`;
+  }
+  return `${minutes}m ${remainingSeconds}s`;
+}
