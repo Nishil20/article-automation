@@ -27,6 +27,9 @@ on:
 env:
   NODE_VERSION: '20'
 
+permissions:
+  contents: write
+
 jobs:
   generate-and-publish:
     name: Generate & Publish Article
