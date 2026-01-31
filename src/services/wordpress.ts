@@ -58,7 +58,7 @@ export class WordPressService {
    */
   async testConnection(): Promise<boolean> {
     try {
-      log.info('Testing WordPress connection');
+      log.info(`Testing WordPress connection to ${this.config.url}`);
       // Use posts endpoint instead of users/me (more compatible with various hosts)
       const response = await this.client.get('/posts', {
         params: { per_page: 1 },
@@ -66,7 +66,21 @@ export class WordPressService {
       log.info(`Connected successfully. Found ${response.headers['x-wp-total'] || 'some'} posts.`);
       return true;
     } catch (error) {
-      log.error('WordPress connection failed', error);
+      const axiosErr = error as AxiosError;
+      if (axiosErr.response) {
+        log.error(`WordPress connection failed: HTTP ${axiosErr.response.status}`, {
+          status: axiosErr.response.status,
+          data: axiosErr.response.data,
+          url: this.config.url,
+        });
+      } else if (axiosErr.code) {
+        log.error(`WordPress connection failed: ${axiosErr.code} - ${axiosErr.message}`, {
+          code: axiosErr.code,
+          url: this.config.url,
+        });
+      } else {
+        log.error('WordPress connection failed', error);
+      }
       return false;
     }
   }
