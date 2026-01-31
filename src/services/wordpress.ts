@@ -1,3 +1,4 @@
+import https from 'https';
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import {
   Config,
@@ -36,6 +37,9 @@ export class WordPressService {
         'Content-Type': 'application/json',
       },
       timeout: 30000,
+      // Force IPv4 — GitHub Actions runners try IPv6 first which causes
+      // ETIMEDOUT on hosts (like Hostinger/LiteSpeed) without IPv6 support
+      httpsAgent: new https.Agent({ family: 4 }),
     });
 
     // Add response interceptor for error handling
