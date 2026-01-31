@@ -72,7 +72,14 @@ jobs:
           # Unsplash Configuration (for featured images)
           UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
           UNSPLASH_ENABLED: ${{ vars.UNSPLASH_ENABLED || 'true' }}
-          
+
+          # Topic Diversity Configuration
+          TOPIC_SOURCES: ${{ vars.TOPIC_SOURCES || 'rss,google,openai,fallback' }}
+          CUSTOM_RSS_FEEDS: ${{ vars.CUSTOM_RSS_FEEDS || '' }}
+          DIVERSITY_SIMILARITY_THRESHOLD: ${{ vars.DIVERSITY_SIMILARITY_THRESHOLD || '0.35' }}
+          DIVERSITY_LOOKBACK_DAYS: ${{ vars.DIVERSITY_LOOKBACK_DAYS || '30' }}
+          DIVERSITY_LOOKBACK_COUNT: ${{ vars.DIVERSITY_LOOKBACK_COUNT || '20' }}
+
           # Logging
           LOG_LEVEL: info
         run: |
@@ -88,16 +95,16 @@ jobs:
             npm start
           fi
 
-      - name: Persist topic cluster data
+      - name: Persist pipeline data
         if: success() && inputs.dry_run != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet data/topic-clusters.json; then
-            echo "No cluster data changes to commit"
+          git add -f data/topic-clusters.json data/history.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No data changes to commit"
           else
-            git add data/topic-clusters.json
-            git commit -m "chore: update topic cluster data [skip ci]"
+            git commit -m "chore: update pipeline data [skip ci]"
             git push
           fi
 
